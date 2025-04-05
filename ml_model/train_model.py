@@ -1,50 +1,60 @@
-# ml_model/train_model.py
-
 import tensorflow as tf
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras import layers, models
+from tensorflow import keras
+from tensorflow.keras import layers
 import os
 
-# Paths to your folders
-dataset_dir = os.path.join(os.getcwd(), 'dataset')
- # Go back to project root
-train_data_dir = dataset_dir  # Empty and occupied folders are here
+# Dataset path (cropped images)
+DATASET_PATH = 'cropped_dataset'  # <--- this is your cropped folder
 
-# Create image generators
-datagen = ImageDataGenerator(
-    rescale=1.0/255,
-    validation_split=0.2  # 20% for validation
+# Image parameters
+IMG_WIDTH = 360
+IMG_HEIGHT = 102
+BATCH_SIZE = 32
+
+# Load dataset
+train_ds = tf.keras.preprocessing.image_dataset_from_directory(
+    DATASET_PATH,
+    validation_split=0.2,
+    subset="training",
+    seed=123,
+    image_size=(IMG_HEIGHT, IMG_WIDTH),  # <--- important to match cropped size
+    batch_size=BATCH_SIZE
 )
 
-train_generator = datagen.flow_from_directory(
-    train_data_dir,
-    target_size=(150, 150),
-    batch_size=16,
-    class_mode='binary',
-    subset='training'
+val_ds = tf.keras.preprocessing.image_dataset_from_directory(
+    DATASET_PATH,
+    validation_split=0.2,
+    subset="validation",
+    seed=123,
+    image_size=(IMG_HEIGHT, IMG_WIDTH),
+    batch_size=BATCH_SIZE
 )
 
-val_generator = datagen.flow_from_directory(
-    train_data_dir,
-    target_size=(150, 150),
-    batch_size=16,
-    class_mode='binary',
-    subset='validation'
-)
+# Prefetching (performance)
+AUTOTUNE = tf.data.AUTOTUNE
+train_ds = train_ds.prefetch(buffer_size=AUTOTUNE)
+val_ds = val_ds.prefetch(buffer_size=AUTOTUNE)
 
-# Build a simple CNN model
-model = models.Sequential([
-    layers.Conv2D(32, (3, 3), activation='relu', input_shape=(150, 150, 3)),
-    layers.MaxPooling2D(2, 2),
+# Build the model
+model = keras.Sequential([
+    layers.Input(shape=(IMG_HEIGHT, IMG_WIDTH, 3)),  # <--- New correct input shape
+    layers.Rescaling(1. / 255),
+
+    layers.Conv2D(32, (3, 3), activation='relu'),
+    layers.MaxPooling2D(),
+
     layers.Conv2D(64, (3, 3), activation='relu'),
-    layers.MaxPooling2D(2, 2),
+    layers.MaxPooling2D(),
+
     layers.Conv2D(128, (3, 3), activation='relu'),
-    layers.MaxPooling2D(2, 2),
+    layers.MaxPooling2D(),
+
     layers.Flatten(),
     layers.Dense(128, activation='relu'),
-    layers.Dense(1, activation='sigmoid')  # Binary classification: empty or occupied
+    layers.Dense(1, activation='sigmoid')  # <--- Binary classification (empty/occupied)
 ])
 
+# Compile the model
 model.compile(
     optimizer='adam',
     loss='binary_crossentropy',
@@ -53,11 +63,13 @@ model.compile(
 
 # Train the model
 history = model.fit(
-    train_generator,
-    validation_data=val_generator,
+    train_ds,
+    validation_data=val_ds,
     epochs=10
 )
 
 # Save the model
+os.makedirs('ml_model', exist_ok=True)
 model.save('ml_model/parking_model.h5')
-print("✅ Model saved to ml_model/parking_model.h5")
+
+print("✅ Model retrained and saved!")

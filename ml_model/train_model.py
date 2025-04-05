@@ -6,7 +6,8 @@ from tensorflow.keras import layers, models
 import os
 
 # Paths to your folders
-dataset_dir = os.path.join(os.getcwd(), '..')  # Go back to project root
+dataset_dir = os.path.join(os.getcwd(), 'dataset')
+ # Go back to project root
 train_data_dir = dataset_dir  # Empty and occupied folders are here
 
 # Create image generators

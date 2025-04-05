@@ -7,7 +7,7 @@ os.makedirs("empty_spots", exist_ok=True)
 os.makedirs("occupied_spots", exist_ok=True)
 
 
-def capture_image(save_folder="empty_spots"):
+def capture_image(save_folder="occupied_spots"):
     timestamp = int(time.time())  # Unique timestamp for filenames
     filename = os.path.join(save_folder, f"spot_{timestamp}.jpg")
 
@@ -44,6 +44,6 @@ while True:
         print("🚪 Exiting...")
         break
 
-# Release camera and close windows
+# Release camera and close windowscc
 cam.release()
 cv2.destroyAllWindows()

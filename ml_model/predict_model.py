@@ -9,9 +9,9 @@ model = tf.keras.models.load_model('ml_model/parking_model.h5')
 
 # Crop settings (same as used during training)
 CROP_X = 140
-CROP_Y = 300
+CROP_Y = 250
 CROP_W = 360
-CROP_H = 120
+CROP_H = 180
 
 # Function to load, crop, and prepare the image
 def prepare_image(image_path):

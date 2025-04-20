@@ -104,9 +104,10 @@ def main():
                 print("You need to login first.")
         elif choice == "6":
             print("Exiting ParkScout client. Goodbye! 🚗")
+            break
         elif choice == "7":
             add_parking_spot()
-            break
+
         else:
             print("Invalid choice. Please select a valid option.")
 

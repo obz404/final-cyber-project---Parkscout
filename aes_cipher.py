@@ -1,4 +1,4 @@
-from Crypto.Cipher import AES
+from Cryptodome.Cipher import AES
 
 # AES Key and Nonce (must be 16 bytes each for AES-128)
 AES_KEY = b'ThisIsASecretKey'

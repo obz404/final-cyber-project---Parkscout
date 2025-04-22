@@ -7,6 +7,13 @@ from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 from concurrent.futures import ThreadPoolExecutor
 
+from aes_cipher import Cipher  # <-- Make sure this is in your project directory
+
+# AES Configuration
+AES_KEY = b'ThisIsASecretKey'
+AES_NONCE = b'ThisIsASecretN'
+cipher = Cipher(AES_KEY, AES_NONCE)
+
 # Logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -47,11 +54,18 @@ def handle_client(sock, addr):
 
     try:
         while True:
-            data = sock.recv(1024).decode()
-            if not data:
+            raw_data = sock.recv(1024)
+            if not raw_data:
                 break
 
-            request = json.loads(data)
+            try:
+                decrypted_data = cipher.aes_decrypt(raw_data)
+                request = json.loads(decrypted_data)
+            except Exception as e:
+                logging.error(f"[DECRYPTION ERROR] {e}")
+                sock.send(json.dumps({"status": "error", "message": "Invalid encrypted request."}).encode())
+                break
+
             action = request.get("action")
             response = {}
 
@@ -98,7 +112,7 @@ def handle_client(sock, addr):
 
             elif action == "update_spot_status":
                 spot_id = request.get("spot_id")
-                status = request.get("status")  # should be 'available' or 'occupied'
+                status = request.get("status")
                 spot = session.query(ParkingSpot).filter_by(id=spot_id).first()
                 if spot:
                     spot.status = status
@@ -106,7 +120,6 @@ def handle_client(sock, addr):
                     response = {"status": "success", "message": f"Spot {spot_id} updated to {status}."}
                 else:
                     response = {"status": "error", "message": "Spot not found."}
-
 
             elif action == "update_parking_spot":
                 spot_id, new_status = request.get("spot_id"), request.get("status")

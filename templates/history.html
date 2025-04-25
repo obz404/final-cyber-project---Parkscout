@@ -1,0 +1,11 @@
+<h2>🚗 Your Parking History</h2>
+<table border="1">
+    <tr><th>Date</th><th>Time</th></tr>
+    {% for record in records %}
+    <tr>
+        <td>{{ record.parking_date }}</td>
+        <td>{{ record.parking_time }}</td>
+    </tr>
+    {% endfor %}
+</table>
+<a href="{{ url_for('main.dashboard') }}">⬅ Back to Dashboard</a>

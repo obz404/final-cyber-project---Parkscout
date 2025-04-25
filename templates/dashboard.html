@@ -1,0 +1,33 @@
+<h2>Dashboard</h2>
+<form method="POST" action="{{ url_for('main.add_spot') }}">
+    {% if is_admin %}
+        <button type="submit">➕ Add Spot</button>
+    {% endif %}
+</form>
+<table border="1">
+    <tr><th>ID</th><th>Status</th><th>Action</th></tr>
+    {% for spot in spots %}
+    <tr>
+        <td>{{ spot.id }}</td>
+        <td>{{ spot.status }}</td>
+        <td>
+            {% if is_admin %}
+                <form method="POST" action="{{ url_for('main.update_spot', spot_id=spot.id, new_status='available' if spot.status != 'available' else 'occupied') }}">
+                    <button type="submit">Toggle</button>
+                </form>
+            {% else %}
+                {% if spot.status == 'available' %}
+                    <form method="POST" action="{{ url_for('main.reserve_spot', spot_id=spot.id) }}">
+                        <button type="submit">Reserve</button>
+                    </form>
+                {% else %}
+                    Unavailable
+                {% endif %}
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+</table>
+<a href="{{ url_for('main.history') }}">🕓 View History</a> |
+<a href="{{ url_for('main.camera_page') }}">📷 Camera</a> |
+<a href="{{ url_for('main.logout') }}">Logout</a>

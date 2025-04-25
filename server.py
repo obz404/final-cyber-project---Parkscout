@@ -6,18 +6,17 @@ from sqlalchemy import create_engine, Column, Integer, String, ForeignKey, exist
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 from concurrent.futures import ThreadPoolExecutor
-
-from aes_cipher import Cipher  # <-- Make sure this is in your project directory
+from aes_cipher import Cipher  # AES encryption module
 
 # AES Configuration
 AES_KEY = b'ThisIsASecretKey'
 AES_NONCE = b'ThisIsASecretN'
 cipher = Cipher(AES_KEY, AES_NONCE)
 
-# Logging
+# Logging Setup
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-# SQLAlchemy setup
+# SQLAlchemy Setup
 Base = declarative_base()
 engine = create_engine("sqlite:///parking.db", connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(bind=engine)
@@ -43,27 +42,42 @@ class ParkingSpot(Base):
     id = Column(Integer, primary_key=True)
     status = Column(String, default="available")
 
-# Initialize DB
+# Initialize Database
+
 def init_database():
     Base.metadata.create_all(engine)
 
-# Client handler
+# Helper function to check if message is encrypted
+
+def is_likely_encrypted(data):
+    try:
+        json.loads(data.decode('utf-8'))
+        return False  # valid JSON, not encrypted
+    except:
+        return True
+
+# Client Handler
+
 def handle_client(sock, addr):
     logging.info(f"[CONNECTED] {addr}")
     session = SessionLocal()
 
     try:
         while True:
-            raw_data = sock.recv(1024)
+            raw_data = sock.recv(4096)
             if not raw_data:
                 break
 
             try:
-                decrypted_data = cipher.aes_decrypt(raw_data)
+                if is_likely_encrypted(raw_data):
+                    decrypted_data = cipher.aes_decrypt(raw_data)
+                else:
+                    decrypted_data = raw_data.decode("utf-8")
                 request = json.loads(decrypted_data)
             except Exception as e:
                 logging.error(f"[DECRYPTION ERROR] {e}")
-                sock.send(json.dumps({"status": "error", "message": "Invalid encrypted request."}).encode())
+                error = json.dumps({"status": "error", "message": "Invalid request."}).encode()
+                sock.send(error)
                 break
 
             action = request.get("action")
@@ -151,7 +165,11 @@ def handle_client(sock, addr):
             else:
                 response = {"status": "error", "message": "Invalid action"}
 
-            sock.send(json.dumps(response).encode())
+            response_bytes = json.dumps(response).encode("utf-8")
+            try:
+                sock.send(cipher.aes_encrypt(response_bytes))
+            except:
+                sock.send(response_bytes)
 
     except Exception as e:
         logging.error(f"[ERROR] {e}")
@@ -160,16 +178,15 @@ def handle_client(sock, addr):
         session.close()
         logging.info(f"[DISCONNECTED] {addr}")
 
-# Server runner
+# Server Starter
+
 def start_server(host="127.0.0.1", port=65432):
     init_database()
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server.bind((host, port))
     server.listen()
     logging.info(f"[LISTENING] Server started on {host}:{port}")
-
     executor = ThreadPoolExecutor(max_workers=10)
-
     try:
         while True:
             client_sock, addr = server.accept()

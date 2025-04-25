@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ParkScout Web Client</title>
+</head>
+<body>
+    <h1>🚗 ParkScout Web Client</h1>
+
+    {% if not session.get("user_id") %}
+    <h2>Login</h2>
+    <form method="POST">
+        <input type="hidden" name="action" value="login">
+        Username: <input name="username"><br>
+        Password: <input type="password" name="password"><br>
+        <input type="submit" value="Login">
+    </form>
+
+    <h2>Register</h2>
+    <form method="POST">
+        <input type="hidden" name="action" value="register">
+        Username: <input name="username"><br>
+        Password: <input type="password" name="password"><br>
+        <input type="submit" value="Register">
+    </form>
+    {% else %}
+
+    <h2>Live Parking Camera</h2>
+    <img src="{{ url_for('video_feed') }}" width="640" height="480"><br>
+
+    <h2>Actions</h2>
+    <form method="POST">
+        <input type="hidden" name="action" value="get_spots">
+        <button type="submit">Refresh Parking Spots</button>
+    </form>
+
+    <form method="POST">
+        <input type="hidden" name="action" value="get_history">
+        <button type="submit">View My Parking History</button>
+    </form>
+
+    <form method="POST">
+        <input type="hidden" name="action" value="add_spot">
+        <button type="submit">Add New Spot (Admin Only)</button>
+    </form>
+
+    <form method="POST">
+        <input type="hidden" name="action" value="reserve">
+        Spot ID to reserve: <input name="spot_id"><br>
+        <input type="submit" value="Reserve Spot">
+    </form>
+
+    <br><a href="{{ url_for('logout') }}">Logout</a>
+    {% endif %}
+</body>
+</html>

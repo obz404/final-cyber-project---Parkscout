@@ -1,4 +1,4 @@
-from .app import db
+from app import db
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -9,3 +9,9 @@ class User(db.Model):
 class ParkingSpot(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     status = db.Column(db.String, default="available")
+
+class ParkingHistory(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, nullable=False)
+    parking_date = db.Column(db.String, nullable=False)
+    parking_time = db.Column(db.String, nullable=False)

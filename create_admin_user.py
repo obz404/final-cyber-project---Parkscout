@@ -1,4 +1,4 @@
-from flask_dashboard.app import create_app, db
+from app import create_app, db
 from flask_dashboard.models import User
 from werkzeug.security import generate_password_hash
 

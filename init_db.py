@@ -1,4 +1,4 @@
-from flask_dashboard.app import create_app, db
+from app import create_app, db
 
 app = create_app()
 

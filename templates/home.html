@@ -1,0 +1,14 @@
+<h1>Welcome to ParkScout</h1>
+<h2>Live Parking Availability</h2>
+<table border="1">
+    <tr><th>Spot ID</th><th>Status</th></tr>
+    {% for spot in spots %}
+    <tr>
+        <td>{{ spot.id }}</td>
+        <td style="color: {{ 'green' if spot.status == 'available' else 'red' }};">{{ spot.status }}</td>
+    </tr>
+    {% endfor %}
+</table>
+<br>
+<a href="{{ url_for('main.login') }}">Login</a> |
+<a href="{{ url_for('main.camera_page') }}">Live Camera</a>

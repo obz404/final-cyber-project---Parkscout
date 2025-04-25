@@ -1,20 +1,14 @@
 from Cryptodome.Cipher import AES
 
-# AES Key and Nonce (must be 16 bytes each for AES-128)
-AES_KEY = b'ThisIsASecretKey'
-AES_NONCE = b'ThisIsASecretN'
-
 class Cipher:
-    def __init__(self, key=AES_KEY, nonce=AES_NONCE):
+    def __init__(self, key, nonce):
         self.key = key
         self.nonce = nonce
 
-    def aes_encrypt(self, txt):
-        cipher = AES.new(self.key, AES.MODE_EAX, nonce=self.nonce)
-        ciphertext, tag = cipher.encrypt_and_digest(txt)
-        return ciphertext
+    def aes_encrypt(self, plaintext_bytes):
+        cipher = AES.new(self.key, AES.MODE_CTR, nonce=self.nonce)
+        return cipher.encrypt(plaintext_bytes)
 
-    def aes_decrypt(self, cipher_text):
-        cipher = AES.new(self.key, AES.MODE_EAX, nonce=self.nonce)
-        msg = cipher.decrypt(cipher_text)
-        return msg.decode('utf-8')
+    def aes_decrypt(self, ciphertext_bytes):
+        cipher = AES.new(self.key, AES.MODE_CTR, nonce=self.nonce)
+        return cipher.decrypt(ciphertext_bytes).decode("utf-8")

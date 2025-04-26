@@ -51,7 +51,15 @@ def login():
         password = request.form['password']
 
         if action == 'register':
-            response = send_request('register', {"username": username, "password": password})
+            # --- FIXED PART START ---
+            is_admin = 'is_admin' in request.form  # Read the checkbox!
+            response = send_request('register', {
+                "username": username,
+                "password": password,
+                "is_admin": is_admin
+            })
+            # --- FIXED PART END ---
+
             if response["status"] == "success":
                 flash("Registration successful. Please log in.", "success")
                 return redirect(url_for('login'))
@@ -121,6 +129,34 @@ def add_spot():
     else:
         flash('Failed to add parking spot.', 'danger')
     return redirect(url_for('dashboard'))
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('is_admin'):
+            flash("Admin access required.", "danger")
+            return redirect(url_for('home'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/admin_dashboard')
+@login_required
+@admin_required
+def admin_dashboard():
+    response = send_request('get_parking_spots')
+    spots = response.get('spots', []) if response['status'] == 'success' else []
+    return render_template('admin_dashboard.html', spots=spots)
+
+@app.route('/remove_spot/<int:spot_id>', methods=['POST'])
+@login_required
+@admin_required
+def remove_spot(spot_id):
+    response = send_request('remove_parking_spot', {"spot_id": spot_id})
+    if response['status'] == 'success':
+        flash('Spot removed successfully.', 'success')
+    else:
+        flash(response.get('message', 'Failed to remove spot.'), 'danger')
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/camera')
 @login_required

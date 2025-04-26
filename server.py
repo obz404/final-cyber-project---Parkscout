@@ -27,6 +27,7 @@ class User(Base):
     id = Column(Integer, primary_key=True)
     username = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
+    is_admin = Column(Integer, default=0)  # <--- ADD THIS
     history = relationship("ParkingHistory", back_populates="user")
 
 class ParkingHistory(Base):
@@ -85,21 +86,46 @@ def handle_client(sock, addr):
 
             if action == "register":
                 username, password = request.get("username"), request.get("password")
+                is_admin = request.get("is_admin", False)  # <-- NEW LINE: get is_admin from client (default False)
+
                 if session.query(exists().where(User.username == username)).scalar():
                     response = {"status": "error", "message": "Username already exists"}
                 else:
-                    user = User(username=username, password=generate_password_hash(password))
+                    user = User(
+                        username=username,
+                        password=generate_password_hash(password),
+                        is_admin=1 if is_admin else 0  # <-- NEW: store 1 (true) if admin
+                    )
                     session.add(user)
                     session.commit()
                     response = {"status": "success", "message": "Registered successfully"}
 
+
+
             elif action == "login":
+
                 username, password = request.get("username"), request.get("password")
+
                 user = session.query(User).filter_by(username=username).first()
+
                 if user and check_password_hash(user.password, password):
-                    response = {"status": "success", "message": "Login successful", "user_id": user.id}
+
+                    response = {
+
+                        "status": "success",
+
+                        "message": "Login successful",
+
+                        "user_id": user.id,
+
+                        "is_admin": bool(user.is_admin)  # <-- ADD THIS LINE
+
+                    }
+
                 else:
+
                     response = {"status": "error", "message": "Invalid credentials"}
+
 
             elif action == "add_parking_history":
                 user_id, date, time = request.get("user_id"), request.get("parking_date"), request.get("parking_time")
@@ -145,24 +171,56 @@ def handle_client(sock, addr):
                 else:
                     response = {"status": "error", "message": "Spot not found"}
 
+
             elif action == "add_parking_spot":
                 new_spot = ParkingSpot(status="available")
                 session.add(new_spot)
                 session.commit()
                 response = {"status": "success", "message": f"Spot {new_spot.id} added", "spot_id": new_spot.id}
 
+
             elif action == "reserve_spot":
+
                 user_id, spot_id = request.get("user_id"), request.get("spot_id")
+
                 user = session.query(User).filter_by(id=user_id).first()
+
                 spot = session.query(ParkingSpot).filter_by(id=spot_id).first()
+
                 if user and spot and spot.status == "available":
+
                     spot.status = "reserved"
+
                     session.commit()
+
                     response = {"status": "success", "message": f"Spot {spot_id} reserved"}
+
                 else:
+
                     response = {"status": "error", "message": "Cannot reserve spot"}
 
+
+            elif action == "remove_parking_spot":
+
+                spot_id = request.get("spot_id")
+
+                spot = session.query(ParkingSpot).filter_by(id=spot_id).first()
+
+                if spot:
+
+                    session.delete(spot)
+
+                    session.commit()
+
+                    response = {"status": "success", "message": f"Spot {spot_id} removed"}
+
+                else:
+
+                    response = {"status": "error", "message": "Spot not found"}
+
+
             else:
+
                 response = {"status": "error", "message": "Invalid action"}
 
             response_bytes = json.dumps(response).encode("utf-8")

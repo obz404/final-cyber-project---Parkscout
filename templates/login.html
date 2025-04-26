@@ -8,14 +8,23 @@
 <body>
     <h1>Welcome to ParkScout</h1>
     <h2>Login or Register</h2>
+
     <form method="post">
         <label>Username:</label><br>
         <input type="text" name="username" required><br><br>
+
         <label>Password:</label><br>
         <input type="password" name="password" required><br><br>
+
+        <div id="adminCheckbox" style="display:none;">
+            <input type="checkbox" id="is_admin" name="is_admin">
+            <label for="is_admin">Register as Admin</label><br><br>
+        </div>
+
         <button type="submit" name="action" value="login">Login</button>
-        <button type="submit" name="action" value="register">Register</button>
+        <button type="submit" name="action" value="register" onclick="showAdminCheckbox()">Register</button>
     </form>
+
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -23,5 +32,11 @@
         {% endfor %}
       {% endif %}
     {% endwith %}
+
+    <script>
+        function showAdminCheckbox() {
+            document.getElementById("adminCheckbox").style.display = "block";
+        }
+    </script>
 </body>
 </html>

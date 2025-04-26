@@ -1,24 +1,32 @@
-from flask import Blueprint, render_template, request, redirect, session, url_for, Response
+from flask import Blueprint, render_template, request, redirect, session, url_for, Response, flash
 from .models import User, ParkingSpot, ParkingHistory
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
+from functools import wraps
 from datetime import datetime
 import cv2
 
 main = Blueprint('main', __name__)
 
-# Redirect to homepage
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Please login first.', 'warning')
+            return redirect(url_for('main.login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 @main.route('/')
 def index():
-    return redirect(url_for('main.home'))
+    return redirect(url_for('main.login'))
 
-# Homepage: list of current spot availability
 @main.route('/home')
+@login_required
 def home():
     spots = ParkingSpot.query.all()
     return render_template('home.html', spots=spots)
 
-# Registration
 @main.route('/register', methods=['GET', 'POST'])
 def register():
     if request.method == 'POST':
@@ -33,9 +41,10 @@ def register():
         return redirect(url_for('main.login'))
     return render_template('register.html')
 
-# Login
 @main.route('/login', methods=['GET', 'POST'])
 def login():
+    if 'user_id' in session:
+        return redirect(url_for('main.home'))
     if request.method == 'POST':
         user = User.query.filter_by(username=request.form['username']).first()
         if user and check_password_hash(user.password, request.form['password']):
@@ -45,19 +54,15 @@ def login():
         return "Invalid credentials"
     return render_template('login.html')
 
-# Dashboard (admin/user view)
 @main.route('/dashboard')
+@login_required
 def dashboard():
-    if 'user_id' not in session:
-        return redirect(url_for('main.login'))
     spots = ParkingSpot.query.all()
     return render_template('dashboard.html', spots=spots, is_admin=session.get('is_admin'))
 
-# Reserve a spot
 @main.route('/reserve/<int:spot_id>', methods=['POST'])
+@login_required
 def reserve_spot(spot_id):
-    if 'user_id' not in session:
-        return redirect(url_for('main.login'))
     spot = ParkingSpot.query.get(spot_id)
     if spot and spot.status == 'available':
         spot.status = 'reserved'
@@ -71,8 +76,8 @@ def reserve_spot(spot_id):
         db.session.commit()
     return redirect(url_for('main.dashboard'))
 
-# Admin: Update spot manually
 @main.route('/update/<int:spot_id>/<string:new_status>', methods=['POST'])
+@login_required
 def update_spot(spot_id, new_status):
     if not session.get('is_admin'):
         return "Unauthorized", 403
@@ -82,8 +87,8 @@ def update_spot(spot_id, new_status):
         db.session.commit()
     return redirect(url_for('main.dashboard'))
 
-# Admin: Add new spot
 @main.route('/add_spot', methods=['POST'])
+@login_required
 def add_spot():
     if not session.get('is_admin'):
         return "Unauthorized", 403
@@ -91,21 +96,19 @@ def add_spot():
     db.session.commit()
     return redirect(url_for('main.dashboard'))
 
-# User: Parking history
 @main.route('/history')
+@login_required
 def history():
-    if 'user_id' not in session:
-        return redirect(url_for('main.login'))
     records = ParkingHistory.query.filter_by(user_id=session['user_id']).all()
     return render_template('history.html', records=records)
 
-# View for camera page
 @main.route('/camera')
+@login_required
 def camera_page():
     return render_template('camera.html')
 
-# Live camera stream
 @main.route('/video_feed')
+@login_required
 def video_feed():
     def generate():
         cap = cv2.VideoCapture(0)
@@ -120,7 +123,6 @@ def video_feed():
         cap.release()
     return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-# Logout
 @main.route('/logout')
 def logout():
     session.clear()

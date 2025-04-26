@@ -1,3 +1,25 @@
-<h2>Live Camera Stream</h2>
-<img src="{{ url_for('main.video_feed') }}" width="600">
-<br><a href="{{ url_for('main.dashboard') }}">⬅ Back to Dashboard</a>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ParkScout - Live Camera</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <script>
+        function refreshCamera() {
+            const img = document.getElementById("camera");
+            img.src = "/static/camera_feed.jpg?t=" + new Date().getTime();
+        }
+        setInterval(refreshCamera, 1000);
+        window.onload = refreshCamera;
+    </script>
+</head>
+<body>
+    <h1>Live Parking Spot Camera</h1>
+
+    <img id="camera" width="720" height="480">
+
+    <br><br>
+    <a href="{{ url_for('home') }}">Back to Home</a><br>
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>

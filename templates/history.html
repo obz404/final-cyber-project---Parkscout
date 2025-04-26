@@ -1,11 +1,27 @@
-<h2>🚗 Your Parking History</h2>
-<table border="1">
-    <tr><th>Date</th><th>Time</th></tr>
-    {% for record in records %}
-    <tr>
-        <td>{{ record.parking_date }}</td>
-        <td>{{ record.parking_time }}</td>
-    </tr>
-    {% endfor %}
-</table>
-<a href="{{ url_for('main.dashboard') }}">⬅ Back to Dashboard</a>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ParkScout - Parking History</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <h1>My Parking History</h1>
+    {% if records %}
+        <ul>
+        {% for record in records %}
+            <li>
+                <strong>Date:</strong> {{ record['date'] }} | 
+                <strong>Spot ID:</strong> {{ record['spot_id'] }} |
+                <strong>Action:</strong> {{ record['action'] }}
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No parking history found.</p>
+    {% endif %}
+    <br>
+    <a href="{{ url_for('home') }}">Back to Home</a><br>
+    <a href="{{ url_for('logout') }}">Logout</a>
+</body>
+</html>

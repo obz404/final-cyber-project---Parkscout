@@ -15,13 +15,19 @@ cipher = Cipher(AES_KEY, AES_NONCE)
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 65432
 SPOT_ID = int(sys.argv[1]) if len(sys.argv) > 1 else 1
+HEADLESS = "--headless" in sys.argv
 CAMERA_INDEX = SPOT_ID - 1
 
 # Load model
 model = tf.keras.models.load_model('ml_model/parking_model.h5')
 
+# ROI
 CROP_X, CROP_Y, CROP_W, CROP_H = 140, 250, 360, 180
-cap = cv2.VideoCapture(CAMERA_INDEX)
+
+if not HEADLESS:
+    cap = cv2.VideoCapture(CAMERA_INDEX)
+else:
+    cap = None  # No camera
 
 def send_status_to_server(spot_id, status):
     try:
@@ -45,6 +51,15 @@ def send_status_to_server(spot_id, status):
         print(f"⚠️ Failed to contact server: {e}")
 
 while True:
+    if HEADLESS:
+        # Simulate or default to status
+        simulated_status = "available"
+        send_status_to_server(SPOT_ID, simulated_status)
+        print(f"✅ Headless mode - status: {simulated_status}")
+        import time
+        time.sleep(1)
+        continue
+
     ret, frame = cap.read()
     if not ret:
         print("❌ Failed to grab frame")
@@ -63,11 +78,14 @@ while True:
     cv2.rectangle(frame, (CROP_X, CROP_Y), (CROP_X+CROP_W, CROP_Y+CROP_H), color, 2)
 
     cv2.imshow(f"Spot {SPOT_ID} - Live View", frame)
+    # Save the processed frame to a static folder so Flask can read it
+    cv2.imwrite('static/camera_feed.jpg', frame)
 
     send_status_to_server(SPOT_ID, status)
 
     if cv2.waitKey(1000) & 0xFF == ord('q'):
         break
 
-cap.release()
+if cap:
+    cap.release()
 cv2.destroyAllWindows()

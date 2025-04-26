@@ -1,31 +1,23 @@
-from flask import Flask, render_template, request, redirect, session, url_for, jsonify, Response
+from flask import Flask, render_template, request, redirect, session, url_for, flash, Response
 import socket
 import json
-import cv2
-import tensorflow as tf
-import numpy as np
 from aes_cipher import Cipher
+from functools import wraps
+import cv2
 
-# AES Encryption Setup
+app = Flask(__name__)
+app.secret_key = "supersecretkey"
+
+# AES Encryption Setup (same as your server)
 AES_KEY = b'ThisIsASecretKey'
 AES_NONCE = b'ThisIsASecretN'
 cipher = Cipher(AES_KEY, AES_NONCE)
 
-# Flask App
-app = Flask(__name__)
-app.secret_key = "supersecretkey"
-
-# Server Socket Config
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 65432
 
-# Load Prediction Model
-model = tf.keras.models.load_model("ml_model/parking_model.h5")
-CROP_X, CROP_Y, CROP_W, CROP_H = 140, 250, 360, 180
-CAMERA_INDEX = 0
-
 def send_request(action, data={}):
-    """Send AES-encrypted request to socket server and decrypt the response."""
+    """Send AES-encrypted request to the server."""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_HOST, SERVER_PORT))
@@ -38,76 +30,119 @@ def send_request(action, data={}):
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
-@app.route("/", methods=["GET", "POST"])
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash("Please login first", "warning")
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+@app.route('/')
 def index():
-    if request.method == "POST":
-        action = request.form.get("action")
+    return redirect(url_for('login'))
 
-        if action == "register":
-            return jsonify(send_request("register", {
-                "username": request.form["username"],
-                "password": request.form["password"]
-            }))
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        action = request.form.get('action')
+        username = request.form['username']
+        password = request.form['password']
 
-        if action == "login":
-            response = send_request("login", {
-                "username": request.form["username"],
-                "password": request.form["password"]
-            })
+        if action == 'register':
+            response = send_request('register', {"username": username, "password": password})
             if response["status"] == "success":
-                session["user_id"] = response["user_id"]
-            return jsonify(response)
+                flash("Registration successful. Please log in.", "success")
+                return redirect(url_for('login'))
+            else:
+                flash(response.get("message", "Registration failed"), "danger")
 
-        if action == "reserve":
-            return jsonify(send_request("reserve_spot", {
-                "user_id": session.get("user_id"),
-                "spot_id": int(request.form["spot_id"])
-            }))
+        elif action == 'login':
+            response = send_request('login', {"username": username, "password": password})
+            if response["status"] == "success":
+                session['user_id'] = response['user_id']
+                session['username'] = username
+                session['is_admin'] = response.get('is_admin', False)
+                return redirect(url_for('home'))
+            else:
+                flash(response.get("message", "Login failed"), "danger")
 
-        if action == "add_spot":
-            return jsonify(send_request("add_parking_spot"))
+    return render_template('login.html')
 
-        if action == "get_history":
-            return jsonify(send_request("get_parking_history", {
-                "user_id": session.get("user_id")
-            }))
-
-        if action == "get_spots":
-            return jsonify(send_request("get_parking_spots"))
-
-    return render_template("index.html")
-
-@app.route("/logout")
+@app.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for("index"))
+    return redirect(url_for('login'))
 
-@app.route("/video_feed")
+@app.route('/home')
+@login_required
+def home():
+    response = send_request('get_parking_spots')
+    spots = response.get('spots', []) if response['status'] == 'success' else []
+    return render_template('home.html', spots=spots)
+
+@app.route('/reserve/<int:spot_id>', methods=['POST'])
+@login_required
+def reserve(spot_id):
+    response = send_request('reserve_spot', {"user_id": session['user_id'], "spot_id": spot_id})
+    if response['status'] == 'success':
+        flash('Spot reserved successfully!', 'success')
+    else:
+        flash(response.get('message', 'Failed to reserve spot.'), 'danger')
+    return redirect(url_for('home'))
+
+@app.route('/history')
+@login_required
+def history():
+    response = send_request('get_parking_history', {"user_id": session['user_id']})
+    records = response.get('history', []) if response['status'] == 'success' else []
+    return render_template('history.html', records=records)
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    if not session.get('is_admin'):
+        flash('Admin access required.', 'danger')
+        return redirect(url_for('home'))
+    response = send_request('get_parking_spots')
+    spots = response.get('spots', []) if response['status'] == 'success' else []
+    return render_template('dashboard.html', spots=spots)
+
+@app.route('/add_spot', methods=['POST'])
+@login_required
+def add_spot():
+    if not session.get('is_admin'):
+        flash('Admin access required.', 'danger')
+        return redirect(url_for('home'))
+    response = send_request('add_parking_spot')
+    if response['status'] == 'success':
+        flash('Parking spot added.', 'success')
+    else:
+        flash('Failed to add parking spot.', 'danger')
+    return redirect(url_for('dashboard'))
+
+@app.route('/camera')
+@login_required
+def camera():
+    return render_template('camera.html')
+
+@app.route('/video_feed')
 def video_feed():
-    def generate():
-        cap = cv2.VideoCapture(CAMERA_INDEX)
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
+    return Response(generate_camera_feed(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
-            cropped = frame[CROP_Y:CROP_Y+CROP_H, CROP_X:CROP_X+CROP_W]
-            resized = cv2.resize(cropped, (360, 102)) / 255.0
-            input_img = np.expand_dims(resized, axis=0)
-            prediction = model.predict(input_img)[0][0]
-            status = "available" if prediction < 0.5 else "occupied"
-            label = "🅿️ EMPTY" if status == "available" else "🚗 OCCUPIED"
-            color = (0, 255, 0) if status == "available" else (0, 0, 255)
+def generate_camera_feed():
+    cap = cv2.VideoCapture(0)
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+        _, buffer = cv2.imencode('.jpg', frame)
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+    cap.release()
 
-            cv2.putText(frame, label, (CROP_X, CROP_Y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-            cv2.rectangle(frame, (CROP_X, CROP_Y), (CROP_X+CROP_W, CROP_Y+CROP_H), color, 2)
+if __name__ == '__main__':
 
-            _, buffer = cv2.imencode('.jpg', frame)
-            yield (b"--frame\r\nContent-Type: image/jpeg\r\n\r\n" + buffer.tobytes() + b"\r\n")
-
-        cap.release()
-
-    return Response(generate(), mimetype="multipart/x-mixed-replace; boundary=frame")
-
-if __name__ == "__main__":
     app.run(debug=True)

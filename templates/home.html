@@ -1,14 +1,37 @@
-<h1>Welcome to ParkScout</h1>
-<h2>Live Parking Availability</h2>
-<table border="1">
-    <tr><th>Spot ID</th><th>Status</th></tr>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ParkScout - Home</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+</head>
+<body>
+    <h1>Parking Spots</h1>
+    <ul>
     {% for spot in spots %}
-    <tr>
-        <td>{{ spot.id }}</td>
-        <td style="color: {{ 'green' if spot.status == 'available' else 'red' }};">{{ spot.status }}</td>
-    </tr>
+        <li>
+            <strong>Spot ID:</strong> {{ spot['id'] }} - <strong>Status:</strong> {{ spot['status'] }}
+            {% if spot['status'] == 'available' %}
+            <form action="{{ url_for('reserve', spot_id=spot['id']) }}" method="post" style="display:inline;">
+                <button type="submit">Reserve</button>
+            </form>
+            {% endif %}
+        </li>
     {% endfor %}
-</table>
-<br>
-<a href="{{ url_for('main.login') }}">Login</a> |
-<a href="{{ url_for('main.camera_page') }}">Live Camera</a>
+    </ul>
+    <br>
+    <a href="{{ url_for('history') }}">View My Parking History</a><br>
+    {% if session.get('is_admin') %}
+        <a href="{{ url_for('dashboard') }}">Admin Dashboard</a><br>
+    {% endif %}
+    <a href="{{ url_for('camera') }}">Live Camera Feed</a><br>
+    <a href="{{ url_for('logout') }}">Logout</a>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="{{ category }}">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+</body>
+</html>

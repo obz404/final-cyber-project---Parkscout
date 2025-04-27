@@ -48,3 +48,93 @@ ParkScout is a smart parking system that detects whether parking spots are **occ
 ```bash
 git clone https://github.com/obz404/final-cyber-project---Parkscout.git
 cd final-cyber-project---Parkscout
+Install Requirements
+Make sure you are in a virtual environment (venv)
+
+bash
+Copy
+Edit
+pip install -r requirements.txt
+(If requirements.txt doesn't exist yet, install manually: flask, tensorflow, scikit-learn, opencv-python, matplotlib)
+
+Run the Server
+
+bash
+Copy
+Edit
+python server.py
+Start the Camera Predictor for Each Spot
+(Example for Spot 1, Camera 0)
+
+bash
+Copy
+Edit
+python camera_predict.py 1 0
+(Add --headless if running without display.)
+
+Run the Flask Web App
+
+bash
+Copy
+Edit
+python app.py
+Access the Web App
+Go to:
+
+cpp
+Copy
+Edit
+http://127.0.0.1:5000
+✅ You can now register, login, reserve spots, view camera, or enter the Admin Dashboard!
+
+🧠 Training a New Model
+If you add new images (cropped real images):
+
+Save images into:
+
+cropped_dataset/empty_spots/
+
+cropped_dataset/occupied_spots/
+
+Retrain the model:
+
+bash
+Copy
+Edit
+python ml_model/train_model.py
+✅ A new ml_model/parking_model.h5 will be created automatically!
+
+🎯 Technologies Used
+Python 3.11
+
+Flask (Web App)
+
+TensorFlow / Keras (Deep Learning Model)
+
+OpenCV (Live Camera Streaming)
+
+SQLAlchemy (Database)
+
+AES Encryption (Secure Communication)
+
+📸 Screenshots
+(Add screenshots later if you want:
+
+Dashboard view
+
+Camera feed
+
+Admin panel)
+
+📢 Notes
+Cameras and parking spots are fully modular.
+
+The model can be retrained easily when adding real-world data.
+
+Admin access can manually override parking spot status.
+
+🤝 Acknowledgments
+This project was developed as part of the Cyber Final Project.
+
+Special thanks to everyone who supported during the testing and training phases!
+

@@ -129,11 +129,6 @@ AES Encryption (Secure communication)
 
 Bootstrap/Custom CSS (Frontend)
 
-📸 Screenshot
-![image](https://github.com/user-attachments/assets/a9d8e3f8-588d-4259-8d11-89d96132fd82)
-![image](https://github.com/user-attachments/assets/71488ab2-de3c-49b3-8314-09d8b05a10f5)
-![image](https://github.com/user-attachments/assets/5f5c1e37-2e50-4ae5-814d-0312eb4b3e20)
-
 
 markdown
 Copy

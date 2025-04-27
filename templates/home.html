@@ -22,7 +22,7 @@
     <br>
     <a href="{{ url_for('history') }}">View My Parking History</a><br>
     {% if session.get('is_admin') %}
-        <a href="{{ url_for('dashboard') }}">Admin Dashboard</a><br>
+        <a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a><br>
     {% endif %}
     <a href="{{ url_for('camera') }}">Live Camera Feed</a><br>
     <a href="{{ url_for('logout') }}">Logout</a>

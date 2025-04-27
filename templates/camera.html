@@ -2,24 +2,56 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>ParkScout - Live Camera</title>
+    <title>ParkScout - Live Cameras</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <script>
-        function refreshCamera() {
-            const img = document.getElementById("camera");
-            img.src = "/static/camera_feed.jpg?t=" + new Date().getTime();
+        function refreshFeeds() {
+            let spotIds = [1, 2, 3]; // <-- Add your SPOT IDs here!
+            spotIds.forEach(function(id) {
+                let camera = document.getElementById("camera_" + id);
+                let status = document.getElementById("status_" + id);
+
+                if (camera) {
+                    fetch('/static/camera_feed_' + id + '.jpg', {method: 'HEAD'})
+                        .then(response => {
+                            if (response.ok) {
+                                camera.src = '/static/camera_feed_' + id + '.jpg?t=' + new Date().getTime();
+                            } else {
+                                camera.src = '/static/placeholder.jpg';
+                            }
+                        })
+                        .catch(() => {
+                            camera.src = '/static/placeholder.jpg';
+                        });
+                }
+
+                fetch('/status/' + id)
+                    .then(response => response.json())
+                    .then(data => {
+                        status.innerText = "Status: " + (data.status === "available" ? "🅿️ EMPTY" : "🚗 OCCUPIED");
+                    });
+            });
         }
-        setInterval(refreshCamera, 1000);
-        window.onload = refreshCamera;
+
+        setInterval(refreshFeeds, 1000);
+        window.onload = refreshFeeds;
     </script>
 </head>
 <body>
-    <h1>Live Parking Spot Camera</h1>
+    <h1>Live Parking Spot Cameras</h1>
 
-    <img id="camera" width="720" height="480">
+    <div style="display: flex; flex-wrap: wrap; gap: 20px;">
+        {% for spot_id in [1,2,3] %}
+        <div style="border: 1px solid #ccc; padding: 10px; text-align: center;">
+            <h2>Spot {{ spot_id }}</h2>
+            <img id="camera_{{ spot_id }}" width="360" height="240" alt="Camera Feed {{ spot_id }}">
+            <h3 id="status_{{ spot_id }}">Status: Loading...</h3>
+        </div>
+        {% endfor %}
+    </div>
 
-    <br><br>
-    <a href="{{ url_for('home') }}">Back to Home</a><br>
+    <br>
+    <a href="{{ url_for('home') }}">Back to Home</a> |
     <a href="{{ url_for('logout') }}">Logout</a>
 </body>
 </html>

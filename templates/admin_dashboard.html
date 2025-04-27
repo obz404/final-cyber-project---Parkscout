@@ -8,6 +8,11 @@
 <body>
     <h1>Admin Dashboard</h1>
 
+    <!-- Add New Spot Button -->
+    <form action="{{ url_for('add_spot') }}" method="post" style="display:inline;">
+        <button type="submit">➕ Add New Parking Spot</button>
+    </form>
+
     <h2>All Parking Spots</h2>
 
     <ul>

@@ -8,7 +8,7 @@ import cv2
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
 
-# AES Encryption Setup (same as your server)
+# AES Encryption Setup
 AES_KEY = b'ThisIsASecretKey'
 AES_NONCE = b'ThisIsASecretN'
 cipher = Cipher(AES_KEY, AES_NONCE)
@@ -16,14 +16,14 @@ cipher = Cipher(AES_KEY, AES_NONCE)
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 65432
 
+# =================== Utilities ===================
+
 def send_request(action, data={}):
-    """Send AES-encrypted request to the server."""
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.connect((SERVER_HOST, SERVER_PORT))
             payload = json.dumps({"action": action, **data}).encode("utf-8")
             s.send(cipher.aes_encrypt(payload))
-
             encrypted_response = s.recv(4096)
             decrypted = cipher.aes_decrypt(encrypted_response)
             return json.loads(decrypted)
@@ -39,9 +39,22 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('is_admin'):
+            flash("Admin access required.", "danger")
+            return redirect(url_for('home'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+# =================== Routes ===================
+
 @app.route('/')
 def index():
     return redirect(url_for('login'))
+
+# --------- Authentication ---------
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -51,15 +64,12 @@ def login():
         password = request.form['password']
 
         if action == 'register':
-            # --- FIXED PART START ---
-            is_admin = 'is_admin' in request.form  # Read the checkbox!
+            is_admin = 'is_admin' in request.form
             response = send_request('register', {
                 "username": username,
                 "password": password,
                 "is_admin": is_admin
             })
-            # --- FIXED PART END ---
-
             if response["status"] == "success":
                 flash("Registration successful. Please log in.", "success")
                 return redirect(url_for('login'))
@@ -82,6 +92,8 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for('login'))
+
+# --------- User Views ---------
 
 @app.route('/home')
 @login_required
@@ -107,37 +119,7 @@ def history():
     records = response.get('history', []) if response['status'] == 'success' else []
     return render_template('history.html', records=records)
 
-@app.route('/dashboard')
-@login_required
-def dashboard():
-    if not session.get('is_admin'):
-        flash('Admin access required.', 'danger')
-        return redirect(url_for('home'))
-    response = send_request('get_parking_spots')
-    spots = response.get('spots', []) if response['status'] == 'success' else []
-    return render_template('dashboard.html', spots=spots)
-
-@app.route('/add_spot', methods=['POST'])
-@login_required
-def add_spot():
-    if not session.get('is_admin'):
-        flash('Admin access required.', 'danger')
-        return redirect(url_for('home'))
-    response = send_request('add_parking_spot')
-    if response['status'] == 'success':
-        flash('Parking spot added.', 'success')
-    else:
-        flash('Failed to add parking spot.', 'danger')
-    return redirect(url_for('dashboard'))
-
-def admin_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if not session.get('is_admin'):
-            flash("Admin access required.", "danger")
-            return redirect(url_for('home'))
-        return f(*args, **kwargs)
-    return decorated_function
+# --------- Admin Views ---------
 
 @app.route('/admin_dashboard')
 @login_required
@@ -146,6 +128,17 @@ def admin_dashboard():
     response = send_request('get_parking_spots')
     spots = response.get('spots', []) if response['status'] == 'success' else []
     return render_template('admin_dashboard.html', spots=spots)
+
+@app.route('/add_spot', methods=['POST'])
+@login_required
+@admin_required
+def add_spot():
+    response = send_request('add_parking_spot')
+    if response['status'] == 'success':
+        flash('Parking spot added.', 'success')
+    else:
+        flash('Failed to add parking spot.', 'danger')
+    return redirect(url_for('admin_dashboard'))
 
 @app.route('/remove_spot/<int:spot_id>', methods=['POST'])
 @login_required
@@ -157,6 +150,17 @@ def remove_spot(spot_id):
     else:
         flash(response.get('message', 'Failed to remove spot.'), 'danger')
     return redirect(url_for('admin_dashboard'))
+
+# --------- Camera Views ---------
+@app.route('/status/<int:spot_id>')
+@login_required
+def status(spot_id):
+    try:
+        with open(f'static/status_{spot_id}.json', 'r') as f:
+            status_data = json.load(f)
+        return status_data
+    except:
+        return {"status": "unknown"}
 
 @app.route('/camera')
 @login_required
@@ -179,6 +183,7 @@ def generate_camera_feed():
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
     cap.release()
 
-if __name__ == '__main__':
+# =================== Main ===================
 
+if __name__ == '__main__':
     app.run(debug=True)

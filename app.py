@@ -167,6 +167,12 @@ def status(spot_id):
 def camera():
     return render_template('camera.html')
 
+@app.route('/api/parking_spots')
+@login_required
+def api_parking_spots():
+    response = send_request('get_parking_spots')
+    return response
+
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_camera_feed(), mimetype='multipart/x-mixed-replace; boundary=frame')

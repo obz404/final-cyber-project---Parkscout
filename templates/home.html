@@ -7,7 +7,8 @@
 </head>
 <body>
     <h1>Parking Spots</h1>
-    <ul>
+
+    <ul id="spot-list">
     {% for spot in spots %}
         <li>
             <strong>Spot ID:</strong> {{ spot['id'] }} - <strong>Status:</strong> {{ spot['status'] }}
@@ -19,6 +20,7 @@
         </li>
     {% endfor %}
     </ul>
+
     <br>
     <a href="{{ url_for('history') }}">View My Parking History</a><br>
     {% if session.get('is_admin') %}
@@ -26,6 +28,7 @@
     {% endif %}
     <a href="{{ url_for('camera') }}">Live Camera Feed</a><br>
     <a href="{{ url_for('logout') }}">Logout</a>
+
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
         {% for category, message in messages %}
@@ -33,5 +36,35 @@
         {% endfor %}
       {% endif %}
     {% endwith %}
+
+    <!-- Live Refresh Script -->
+    <script>
+    function refreshSpots() {
+        fetch('/api/parking_spots')
+        .then(response => response.json())
+        .then(data => {
+            const spotList = document.getElementById('spot-list');
+            spotList.innerHTML = '';
+            data.spots.forEach(spot => {
+                let spotElement = document.createElement('li');
+                spotElement.innerHTML = `
+                    <strong>Spot ID:</strong> ${spot.id} - <strong>Status:</strong> ${spot.status}
+                    ${spot.status === 'available' ? `
+                        <form action="/reserve/${spot.id}" method="post" style="display:inline;">
+                            <button type="submit">Reserve</button>
+                        </form>
+                    ` : ''}
+                `;
+                spotList.appendChild(spotElement);
+            });
+        });
+    }
+
+    // Refresh every 3 seconds
+    setInterval(refreshSpots, 3000);
+
+    // Load spots immediately when page loads
+    refreshSpots();
+    </script>
 </body>
 </html>

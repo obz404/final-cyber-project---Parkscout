@@ -1,28 +1,30 @@
 # 🚗 ParkScout — Intelligent Parking Spot Detection System
 
-ParkScout is a smart parking system that detects whether parking spots are **occupied** or **available** using **live camera feed**, **TensorFlow deep learning**, and a **Flask web dashboard**.
+ParkScout is a smart parking system that detects whether parking spots are **occupied**, **reserved**, or **available** using **live camera feed**, **TensorFlow deep learning**, and a **Flask web dashboard**.
 
 🔵 Live camera streams monitor parking spots  
-🔵 Real-time status prediction (Occupied/Available)  
+🔵 Real-time automatic updates without refreshing  
 🔵 Web dashboard for users and admins  
-🔵 Admins can manually add or remove parking spots  
-🔵 Machine learning model retrained on live real-world data for maximum accuracy
+🔵 Admins can add or remove parking spots  
+🔵 Machine learning model retrained easily with real-world data
 
 ---
 
 ## 📋 Features
 
-- **Multiple Cameras Support** (multi-spot)
-- **AES-encrypted communication** between camera, server, and web app
-- **Flask Web App** for users to:
-  - View live parking availability
-  - Reserve parking spots
-  - See parking history
-- **Admin Panel** to:
-  - Add/remove parking spots
-  - Monitor spot status
-- **Live Camera Streaming** inside the dashboard
-- **Model retraining** from real-world images
+- **Multiple Cameras and Multiple Spots** supported
+- **Real-Time Status Updates** (auto-refresh every few seconds)
+- **AES-encrypted Communication** between camera, server, and web app
+- **Flask Web App**:
+  - View parking availability (live)
+  - Reserve available spots
+  - View parking history
+- **Admin Panel**:
+  - Add new parking spots
+  - Remove parking spots
+  - Monitor and manage all spot statuses
+- **Live Camera Streaming** per spot
+- **Model Retraining** using real-world photos
 
 ---
 
@@ -30,15 +32,14 @@ ParkScout is a smart parking system that detects whether parking spots are **occ
 
 | Folder / File | Description |
 |:--------------|:------------|
-| `server.py` | Handles user login, registration, parking spot status, AES encryption |
-| `camera_predict.py` | Reads live camera feed, predicts spot status, updates server |
-| `client.py` | (Old) CLI-based user client — replaced by Flask app |
-| `app.py` | Flask web app (user login, reserve, admin dashboard, camera feed) |
-| `ml_model/` | Contains the machine learning model and training scripts |
-| `cropped_dataset/` | Training dataset (empty_spots/occupied_spots folders) |
-| `static/` | CSS files, saved camera frames |
-| `templates/` | HTML files for the Flask app |
-| `live_camera_sample_collector.py` | Script to manually save real-world training images |
+| `server.py` | Handles user login, registration, spot status management, AES encryption |
+| `camera_predict.py` | Reads live camera feed, predicts spot status, updates server automatically |
+| `app.py` | Flask web app: user login, reserve, dashboard, camera feed |
+| `ml_model/` | Contains the ML model + training scripts (`train_model.py`, `evaluate_model.py`) |
+| `cropped_dataset/` | Training images (organized into `empty_spots/` and `occupied_spots/`) |
+| `static/` | Stylesheets, saved live camera images, placeholder image |
+| `templates/` | HTML templates (`home.html`, `admin_dashboard.html`, etc.) |
+| `live_camera_sample_collector.py` | Script to capture and save training images manually |
 
 ---
 
@@ -49,13 +50,12 @@ ParkScout is a smart parking system that detects whether parking spots are **occ
 git clone https://github.com/obz404/final-cyber-project---Parkscout.git
 cd final-cyber-project---Parkscout
 Install Requirements
-Make sure you are in a virtual environment (venv)
 
 bash
 Copy
 Edit
 pip install -r requirements.txt
-(If requirements.txt doesn't exist yet, install manually: flask, tensorflow, scikit-learn, opencv-python, matplotlib)
+(or manually install: flask, tensorflow, opencv-python, scikit-learn, matplotlib, sqlalchemy, Werkzeug)
 
 Run the Server
 
@@ -64,13 +64,13 @@ Copy
 Edit
 python server.py
 Start the Camera Predictor for Each Spot
-(Example for Spot 1, Camera 0)
+(Example: Spot 1 uses Camera 0)
 
 bash
 Copy
 Edit
 python camera_predict.py 1 0
-(Add --headless if running without display.)
+(Use --headless if you don't want to display camera window.)
 
 Run the Flask Web App
 
@@ -79,16 +79,14 @@ Copy
 Edit
 python app.py
 Access the Web App
-Go to:
+Open browser and go to:
 
 cpp
 Copy
 Edit
 http://127.0.0.1:5000
-✅ You can now register, login, reserve spots, view camera, or enter the Admin Dashboard!
-
 🧠 Training a New Model
-If you add new images (cropped real images):
+If you collect new images:
 
 Save images into:
 
@@ -102,39 +100,57 @@ bash
 Copy
 Edit
 python ml_model/train_model.py
-✅ A new ml_model/parking_model.h5 will be created automatically!
+✅ Model will be saved automatically as ml_model/parking_model.h5.
+
+You can also evaluate it using:
+
+bash
+Copy
+Edit
+python ml_model/evaluate_model.py
+🎥 Live Camera Feed
+Each parking spot has its own live video feed.
+The feed shows a cropped rectangle and a label (EMPTY / OCCUPIED) in real-time.
+
+If the camera is disconnected, a placeholder image is shown instead.
 
 🎯 Technologies Used
 Python 3.11
 
-Flask (Web App)
+Flask (Web Framework)
 
-TensorFlow / Keras (Deep Learning Model)
+TensorFlow / Keras (Deep Learning)
 
-OpenCV (Live Camera Streaming)
+OpenCV (Camera Streaming)
 
-SQLAlchemy (Database)
+SQLAlchemy (Database ORM)
 
-AES Encryption (Secure Communication)
+AES Encryption (Secure communication)
 
-📸 Screenshots
-(Add screenshots later if you want:
+Bootstrap/Custom CSS (Frontend)
 
-Dashboard view
+📸 Screenshot
+![image](https://github.com/user-attachments/assets/a9d8e3f8-588d-4259-8d11-89d96132fd82)
+![image](https://github.com/user-attachments/assets/71488ab2-de3c-49b3-8314-09d8b05a10f5)
+![image](https://github.com/user-attachments/assets/5f5c1e37-2e50-4ae5-814d-0312eb4b3e20)
 
-Camera feed
 
-Admin panel)
-
+markdown
+Copy
+Edit
+![ParkScout Dashboard](static/project_screenshot.png)
 📢 Notes
-Cameras and parking spots are fully modular.
+Parking spot statuses update automatically every few seconds (AJAX polling).
 
-The model can be retrained easily when adding real-world data.
+Model retraining is simple and fully integrated.
 
-Admin access can manually override parking spot status.
+Admins can manage parking spots via a separate dashboard.
+
+Each camera can monitor a different spot independently.
+
+Database (parking.db) stores users, parking spots, and parking history.
 
 🤝 Acknowledgments
-This project was developed as part of the Cyber Final Project.
+This project was developed for the Cyber Final Project.
 
-Special thanks to everyone who supported during the testing and training phases!
-
+Special thanks to all testers and helpers during the development phase!

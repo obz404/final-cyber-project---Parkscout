@@ -7,6 +7,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 from werkzeug.security import generate_password_hash, check_password_hash
 from concurrent.futures import ThreadPoolExecutor
 from aes_cipher import Cipher  # AES encryption module
+from datetime import datetime
 
 # AES Configuration
 AES_KEY = b'ThisIsASecretKey'
@@ -36,6 +37,7 @@ class ParkingHistory(Base):
     user_id = Column(Integer, ForeignKey('users.id'))
     parking_date = Column(String, nullable=False)
     parking_time = Column(String, nullable=False)
+    spot_id = Column(Integer, nullable=True)  # <--- ADD THIS
     user = relationship("User", back_populates="history")
 
 class ParkingSpot(Base):
@@ -136,12 +138,18 @@ def handle_client(sock, addr):
                 else:
                     response = {"status": "error", "message": "User not found"}
 
+
             elif action == "get_parking_history":
                 user_id = request.get("user_id")
                 history = session.query(ParkingHistory).filter_by(user_id=user_id).all()
                 if history:
                     response = {"status": "success", "history": [
-                        {"parking_date": h.parking_date, "parking_time": h.parking_time} for h in history
+                        {
+                            "parking_date": h.parking_date,
+                            "parking_time": h.parking_time,
+                            "spot_id": h.spot_id,
+                            "action": "Reserved"
+                        } for h in history
                     ]}
                 else:
                     response = {"status": "error", "message": "No history found"}
@@ -179,50 +187,44 @@ def handle_client(sock, addr):
                 response = {"status": "success", "message": f"Spot {new_spot.id} added", "spot_id": new_spot.id}
 
 
+
             elif action == "reserve_spot":
 
                 user_id, spot_id = request.get("user_id"), request.get("spot_id")
-
                 user = session.query(User).filter_by(id=user_id).first()
-
                 spot = session.query(ParkingSpot).filter_by(id=spot_id).first()
-
                 if user and spot and spot.status == "available":
-
                     spot.status = "reserved"
+                    session.commit()
+                    now = datetime.now()
+                    parking_date = now.strftime("%Y-%m-%d")
+                    parking_time = now.strftime("%H:%M:%S")
+                    session.add(ParkingHistory(
+                        user_id=user_id,
+                        parking_date=parking_date,
+                        parking_time=parking_time,
+                        spot_id=spot_id
+                    ))
 
                     session.commit()
-
                     response = {"status": "success", "message": f"Spot {spot_id} reserved"}
-
                 else:
-
                     response = {"status": "error", "message": "Cannot reserve spot"}
 
 
+
             elif action == "remove_parking_spot":
-
                 spot_id = request.get("spot_id")
-
                 spot = session.query(ParkingSpot).filter_by(id=spot_id).first()
-
                 if spot:
-
                     session.delete(spot)
-
                     session.commit()
-
                     response = {"status": "success", "message": f"Spot {spot_id} removed"}
-
                 else:
-
                     response = {"status": "error", "message": "Spot not found"}
 
-
             else:
-
                 response = {"status": "error", "message": "Invalid action"}
-
             response_bytes = json.dumps(response).encode("utf-8")
             try:
                 sock.send(cipher.aes_encrypt(response_bytes))

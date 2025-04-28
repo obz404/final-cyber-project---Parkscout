@@ -7,19 +7,21 @@
 </head>
 <body>
     <h1>My Parking History</h1>
+
     {% if records %}
         <ul>
         {% for record in records %}
             <li>
-                <strong>Date:</strong> {{ record['date'] }} | 
-                <strong>Spot ID:</strong> {{ record['spot_id'] }} |
-                <strong>Action:</strong> {{ record['action'] }}
+                <strong>Date:</strong> {{ record['parking_date'] }} |
+                <strong>Time:</strong> {{ record['parking_time'] }} |
+                <strong>Action:</strong> Reserved
             </li>
         {% endfor %}
         </ul>
     {% else %}
         <p>No parking history found.</p>
     {% endif %}
+
     <br>
     <a href="{{ url_for('home') }}">Back to Home</a><br>
     <a href="{{ url_for('logout') }}">Logout</a>

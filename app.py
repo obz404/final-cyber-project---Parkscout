@@ -4,6 +4,7 @@ import json
 from aes_cipher import Cipher
 from functools import wraps
 import cv2
+from datetime import datetime
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
@@ -102,12 +103,23 @@ def home():
     spots = response.get('spots', []) if response['status'] == 'success' else []
     return render_template('home.html', spots=spots)
 
+
 @app.route('/reserve/<int:spot_id>', methods=['POST'])
 @login_required
 def reserve(spot_id):
     response = send_request('reserve_spot', {"user_id": session['user_id'], "spot_id": spot_id})
     if response['status'] == 'success':
-        flash('Spot reserved successfully!', 'success')
+        # הוספת תיעוד להיסטוריה
+        now = datetime.now()
+        date_str = now.strftime("%Y-%m-%d")
+        time_str = now.strftime("%H:%M:%S")
+        history_response = send_request('add_parking_history', {
+            "user_id": session['user_id'],
+            "parking_date": date_str,
+            "parking_time": time_str
+        })
+
+        flash('Spot reserved successfully and history updated!', 'success')
     else:
         flash(response.get('message', 'Failed to reserve spot.'), 'danger')
     return redirect(url_for('home'))

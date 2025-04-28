@@ -1,0 +1,6 @@
+Flask
+SQLAlchemy
+TensorFlow
+opencv-python
+pycryptodome
+Werkzeug

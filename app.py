@@ -5,6 +5,12 @@ from aes_cipher import Cipher
 from functools import wraps
 import cv2
 from datetime import datetime
+# Hardcoded admin usernames and passwords
+ADMIN_CREDENTIALS = {
+    "admin1": "adminpass123",
+    "obz404": "obzsecure!",
+    "manager": "letmein456"
+}
 
 app = Flask(__name__)
 app.secret_key = "supersecretkey"
@@ -65,7 +71,7 @@ def login():
         password = request.form['password']
 
         if action == 'register':
-            is_admin = 'is_admin' in request.form
+            is_admin = username in ADMIN_CREDENTIALS and ADMIN_CREDENTIALS[username] == password
             response = send_request('register', {
                 "username": username,
                 "password": password,

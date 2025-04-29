@@ -44,9 +44,7 @@ class ParkingSpot(Base):
     __tablename__ = 'parking_spots'
     id = Column(Integer, primary_key=True)
     status = Column(String, default="available")
-
 # Initialize Database
-
 def init_database():
     Base.metadata.create_all(engine)
 
@@ -102,32 +100,19 @@ def handle_client(sock, addr):
                     session.commit()
                     response = {"status": "success", "message": "Registered successfully"}
 
-
-
             elif action == "login":
-
                 username, password = request.get("username"), request.get("password")
-
                 user = session.query(User).filter_by(username=username).first()
-
                 if user and check_password_hash(user.password, password):
-
                     response = {
-
                         "status": "success",
-
                         "message": "Login successful",
-
                         "user_id": user.id,
-
                         "is_admin": bool(user.is_admin)  # <-- ADD THIS LINE
-
                     }
-
                 else:
 
                     response = {"status": "error", "message": "Invalid credentials"}
-
 
             elif action == "add_parking_history":
                 user_id, date, time = request.get("user_id"), request.get("parking_date"), request.get("parking_time")
@@ -137,7 +122,6 @@ def handle_client(sock, addr):
                     response = {"status": "success", "message": "Parking history recorded"}
                 else:
                     response = {"status": "error", "message": "User not found"}
-
 
             elif action == "get_parking_history":
                 user_id = request.get("user_id")
@@ -179,14 +163,11 @@ def handle_client(sock, addr):
                 else:
                     response = {"status": "error", "message": "Spot not found"}
 
-
             elif action == "add_parking_spot":
                 new_spot = ParkingSpot(status="available")
                 session.add(new_spot)
                 session.commit()
                 response = {"status": "success", "message": f"Spot {new_spot.id} added", "spot_id": new_spot.id}
-
-
 
             elif action == "reserve_spot":
 
@@ -210,8 +191,6 @@ def handle_client(sock, addr):
                     response = {"status": "success", "message": f"Spot {spot_id} reserved"}
                 else:
                     response = {"status": "error", "message": "Cannot reserve spot"}
-
-
 
             elif action == "remove_parking_spot":
                 spot_id = request.get("spot_id")
@@ -237,9 +216,7 @@ def handle_client(sock, addr):
         sock.close()
         session.close()
         logging.info(f"[DISCONNECTED] {addr}")
-
 # Server Starter
-
 def start_server(host="127.0.0.1", port=65432):
     init_database()
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -254,6 +231,5 @@ def start_server(host="127.0.0.1", port=65432):
     except KeyboardInterrupt:
         logging.info("[SHUTDOWN] Server shutting down...")
         server.close()
-
 if __name__ == "__main__":
     start_server()

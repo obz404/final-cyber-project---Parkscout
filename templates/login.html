@@ -16,13 +16,8 @@
         <label>Password:</label><br>
         <input type="password" name="password" required><br><br>
 
-        <div id="adminCheckbox" style="display:none;">
-            <input type="checkbox" id="is_admin" name="is_admin">
-            <label for="is_admin">Register as Admin</label><br><br>
-        </div>
-
         <button type="submit" name="action" value="login">Login</button>
-        <button type="submit" name="action" value="register" onclick="showAdminCheckbox()">Register</button>
+        <button type="submit" name="action" value="register">Register</button>
     </form>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
@@ -32,11 +27,5 @@
         {% endfor %}
       {% endif %}
     {% endwith %}
-
-    <script>
-        function showAdminCheckbox() {
-            document.getElementById("adminCheckbox").style.display = "block";
-        }
-    </script>
 </body>
 </html>

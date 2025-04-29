@@ -17,7 +17,7 @@ cipher = Cipher(AES_KEY, AES_NONCE)
 SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 65432
 
-# Handle Command Line Arguments
+# Command line args
 SPOT_ID = int(sys.argv[1]) if len(sys.argv) > 1 else 1
 CAMERA_INDEX = int(sys.argv[2]) if len(sys.argv) > 2 else SPOT_ID - 1
 HEADLESS = "--headless" in sys.argv
@@ -25,16 +25,28 @@ HEADLESS = "--headless" in sys.argv
 # Load model
 model = tf.keras.models.load_model('ml_model/parking_model.h5')
 
-# ROI
+# ROI crop area
 CROP_X, CROP_Y, CROP_W, CROP_H = 140, 250, 360, 180
 
-# Camera Setup
-if not HEADLESS:
-    cap = cv2.VideoCapture(CAMERA_INDEX)
-else:
-    cap = None
+# Camera
+cap = None if HEADLESS else cv2.VideoCapture(CAMERA_INDEX)
 
-# Functions
+# --- Helpers ---
+
+def get_current_status(spot_id):
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.connect((SERVER_HOST, SERVER_PORT))
+            request = {"action": "get_parking_spots"}
+            s.send(cipher.aes_encrypt(json.dumps(request).encode()))
+            response = cipher.aes_decrypt(s.recv(4096))
+            data = json.loads(response)
+            for spot in data.get("spots", []):
+                if spot["id"] == spot_id:
+                    return spot["status"]
+    except:
+        return None
+
 def send_status_to_server(spot_id, status):
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -44,12 +56,9 @@ def send_status_to_server(spot_id, status):
                 "spot_id": spot_id,
                 "status": status
             }
-            plaintext = json.dumps(message).encode("utf-8")
-            encrypted = cipher.aes_encrypt(plaintext)
+            encrypted = cipher.aes_encrypt(json.dumps(message).encode())
             s.send(encrypted)
-
-            encrypted_response = s.recv(1024)
-            decrypted_response = cipher.aes_decrypt(encrypted_response)
+            decrypted_response = cipher.aes_decrypt(s.recv(1024))
             response = json.loads(decrypted_response)
             print(f"🔁 Server response: {response}")
     except Exception as e:
@@ -61,7 +70,7 @@ def save_status_locally(spot_id, status):
     with open(f'static/status_{spot_id}.json', 'w') as f:
         json.dump(status_data, f)
 
-# Main loop
+# --- Main Loop ---
 while True:
     if HEADLESS:
         simulated_status = "available"
@@ -82,13 +91,31 @@ while True:
     input_img = np.expand_dims(resized, axis=0)
 
     prediction = model.predict(input_img)[0][0]
-    status = "available" if prediction < 0.5 else "occupied"
-    label = "🅿️ EMPTY" if status == "available" else "🚗 OCCUPIED"
-    color = (0, 255, 0) if status == "available" else (0, 0, 255)
+    predicted_status = "available" if prediction < 0.5 else "occupied"
 
+    current_status = get_current_status(SPOT_ID)
+    if current_status == "reserved":
+        # Do not override reserved unless car is detected
+        status = "reserved" if predicted_status == "available" else "occupied"
+    else:
+        status = predicted_status
+
+    # === Visualization label and color ===
+    if status == "reserved":
+        label = "🅿️ RESERVED"
+        color = (160, 32, 240)  # orange
+    elif status == "occupied":
+        label = "🚗 OCCUPIED"
+        color = (0, 0, 255)  # red
+    else:
+        label = "🅿️ EMPTY"
+        color = (0, 255, 0)  # green
+
+    # Draw
     cv2.putText(frame, label, (CROP_X, CROP_Y - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
-    cv2.rectangle(frame, (CROP_X, CROP_Y), (CROP_X+CROP_W, CROP_Y+CROP_H), color, 2)
+    cv2.rectangle(frame, (CROP_X, CROP_Y), (CROP_X + CROP_W, CROP_Y + CROP_H), color, 2)
 
+    # Save for UI
     os.makedirs('static', exist_ok=True)
     cv2.imwrite(f'static/camera_feed_{SPOT_ID}.jpg', frame)
 
@@ -96,7 +123,6 @@ while True:
     save_status_locally(SPOT_ID, status)
 
     cv2.imshow(f"Spot {SPOT_ID} - Camera {CAMERA_INDEX}", frame)
-
     if cv2.waitKey(1000) & 0xFF == ord('q'):
         break
 

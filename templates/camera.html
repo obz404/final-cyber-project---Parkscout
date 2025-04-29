@@ -28,7 +28,15 @@
                 fetch('/status/' + id)
                     .then(response => response.json())
                     .then(data => {
-                        status.innerText = "Status: " + (data.status === "available" ? "🅿️ EMPTY" : "🚗 OCCUPIED");
+                        let displayStatus = "";
+                        if (data.status === "available") {
+                            displayStatus = "🅿️ EMPTY";
+                        } else if (data.status === "reserved") {
+                            displayStatus = "⏳ RESERVED";
+                        } else {
+                            displayStatus = "🚗 OCCUPIED";
+                        }
+                        status.innerText = "Status: " + displayStatus;
                     });
             });
         }

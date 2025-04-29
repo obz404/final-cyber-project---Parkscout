@@ -77,13 +77,13 @@ while True:
         send_status_to_server(SPOT_ID, simulated_status)
         save_status_locally(SPOT_ID, simulated_status)
         print(f"✅ Headless mode - Spot {SPOT_ID}: {simulated_status}")
-        time.sleep(1)
+        time.sleep(5)
         continue
 
     ret, frame = cap.read()
     if not ret:
         print(f"⚠️ Warning: Failed to grab frame for Spot {SPOT_ID}. Skipping update.")
-        time.sleep(1)
+        time.sleep(5)
         continue
 
     cropped = frame[CROP_Y:CROP_Y+CROP_H, CROP_X:CROP_X+CROP_W]

@@ -8,6 +8,14 @@ import os
 import time
 from aes_cipher import Cipher
 
+camera_sock = None
+
+def init_camera_socket():
+    global camera_sock
+    if camera_sock is None:
+        camera_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        camera_sock.connect((SERVER_HOST, SERVER_PORT))
+
 # AES setup
 AES_KEY = b'ThisIsASecretKey'
 AES_NONCE = b'ThisIsASecretN'
@@ -34,35 +42,60 @@ cap = None if HEADLESS else cv2.VideoCapture(CAMERA_INDEX)
 # --- Helpers ---
 
 def get_current_status(spot_id):
+    """
+    Reuse single socket to ask server for all spots,
+    then extract this spot’s status.
+    """
+    global camera_sock
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((SERVER_HOST, SERVER_PORT))
-            request = {"action": "get_parking_spots"}
-            s.send(cipher.aes_encrypt(json.dumps(request).encode()))
-            response = cipher.aes_decrypt(s.recv(4096))
-            data = json.loads(response)
-            for spot in data.get("spots", []):
-                if spot["id"] == spot_id:
-                    return spot["status"]
-    except:
+        init_camera_socket()
+
+        request = {"action": "get_parking_spots"}
+        payload = json.dumps(request).encode("utf-8")
+        camera_sock.sendall(cipher.aes_encrypt(payload))
+
+        encrypted_resp = camera_sock.recv(4096)
+        response = cipher.aes_decrypt(encrypted_resp)
+        data = json.loads(response)
+
+        for spot in data.get("spots", []):
+            if spot["id"] == spot_id:
+                return spot["status"]
+
+    except Exception:
+        # on any error, reset the socket so next call reconnects
+        try: camera_sock.close()
+        except: pass
+        camera_sock = None
         return None
 
 def send_status_to_server(spot_id, status):
+    """
+    Reuse single socket to push this spot’s updated status.
+    """
+    global camera_sock
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((SERVER_HOST, SERVER_PORT))
-            message = {
-                "action": "update_parking_spot",
-                "spot_id": spot_id,
-                "status": status
-            }
-            encrypted = cipher.aes_encrypt(json.dumps(message).encode())
-            s.send(encrypted)
-            decrypted_response = cipher.aes_decrypt(s.recv(1024))
-            response = json.loads(decrypted_response)
-            print(f"🔁 Server response: {response}")
+        init_camera_socket()
+
+        message = {
+            "action": "update_parking_spot",
+            "spot_id": spot_id,
+            "status": status
+        }
+        payload = json.dumps(message).encode("utf-8")
+        camera_sock.sendall(cipher.aes_encrypt(payload))
+
+        encrypted_resp = camera_sock.recv(4096)
+        decrypted = cipher.aes_decrypt(encrypted_resp)
+        response = json.loads(decrypted)
+        print(f"🔁 Server response: {response}")
+
     except Exception as e:
         print(f"⚠️ Failed to contact server: {e}")
+        # reset so next call will reconnect
+        try: camera_sock.close()
+        except: pass
+        camera_sock = None
 
 def save_status_locally(spot_id, status):
     status_data = {"spot_id": spot_id, "status": status}

@@ -212,10 +212,10 @@ def handle_client(sock, addr):
 
     except Exception as e:
         logging.error(f"[ERROR] {e}")
-    finally:
-        sock.close()
-        session.close()
-        logging.info(f"[DISCONNECTED] {addr}")
+    #  finally:
+    #     sock.close()
+    #     session.close()
+    #     logging.info(f"[DISCONNECTED] {addr}")
 # Server Starter
 def start_server(host="127.0.0.1", port=65432):
     init_database()

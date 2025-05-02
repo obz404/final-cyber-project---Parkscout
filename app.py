@@ -5,6 +5,18 @@ from aes_cipher import Cipher
 from functools import wraps
 import cv2
 from datetime import datetime
+
+
+# ————————————————
+# Module-level socket for reuse
+client_sock = None
+
+def init_client_socket():
+    global client_sock
+    if client_sock is None:
+        client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_sock.connect((SERVER_HOST, SERVER_PORT))
+
 # Hardcoded admin usernames and passwords
 ADMIN_CREDENTIALS = {
     "admin1": "adminpass123",
@@ -25,16 +37,35 @@ SERVER_PORT = 65432
 
 # =================== Utilities ===================
 
-def send_request(action, data={}):
+def send_request(action, data=None):
+    """
+    Reuse a single TCP connection for all requests.
+    """
+    global client_sock
+    if data is None:
+        data = {}
+
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.connect((SERVER_HOST, SERVER_PORT))
-            payload = json.dumps({"action": action, **data}).encode("utf-8")
-            s.send(cipher.aes_encrypt(payload))
-            encrypted_response = s.recv(4096)
-            decrypted = cipher.aes_decrypt(encrypted_response)
-            return json.loads(decrypted)
+        # ensure socket is connected only once
+        init_client_socket()
+
+        # send encrypted payload
+        payload = json.dumps({"action": action, **data}).encode("utf-8")
+        encrypted = cipher.aes_encrypt(payload)
+        client_sock.sendall(encrypted)
+
+        # receive and decrypt response
+        encrypted_resp = client_sock.recv(4096)
+        decrypted = cipher.aes_decrypt(encrypted_resp)
+        return json.loads(decrypted)
+
     except Exception as e:
+        # on error, close and reset so next call will reconnect
+        try:
+            client_sock.close()
+        except:
+            pass
+        client_sock = None
         return {"status": "error", "message": str(e)}
 
 def login_required(f):
@@ -119,11 +150,6 @@ def reserve(spot_id):
         now = datetime.now()
         date_str = now.strftime("%Y-%m-%d")
         time_str = now.strftime("%H:%M:%S")
-        history_response = send_request('add_parking_history', {
-            "user_id": session['user_id'],
-            "parking_date": date_str,
-            "parking_time": time_str
-        })
 
         flash('Spot reserved successfully and history updated!', 'success')
     else:

@@ -1,18 +1,28 @@
+<!--
+camera.html
+
+Dynamic template for ParkScout Live Cameras page.
+Displays live camera feeds and status for each parking spot.
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>ParkScout - Live Cameras</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+
     <script>
+        // Receive the spot IDs passed from Flask as a JSON list
+        const spotIds = {{ spot_ids | tojson }};
+
         function refreshFeeds() {
-            let spotIds = [1, 2, 3]; // <-- Add your SPOT IDs here!
             spotIds.forEach(function(id) {
-                let camera = document.getElementById("camera_" + id);
-                let status = document.getElementById("status_" + id);
+                const camera = document.getElementById("camera_" + id);
+                const status = document.getElementById("status_" + id);
 
                 if (camera) {
-                    fetch('/static/camera_feed_' + id + '.jpg', {method: 'HEAD'})
+                    fetch('/static/camera_feed_' + id + '.jpg', { method: 'HEAD' })
                         .then(response => {
                             if (response.ok) {
                                 camera.src = '/static/camera_feed_' + id + '.jpg?t=' + new Date().getTime();
@@ -41,15 +51,15 @@
             });
         }
 
-        setInterval(refreshFeeds, 1000);
         window.onload = refreshFeeds;
+        setInterval(refreshFeeds, 1000);
     </script>
 </head>
 <body>
     <h1>Live Parking Spot Cameras</h1>
 
     <div style="display: flex; flex-wrap: wrap; gap: 20px;">
-        {% for spot_id in [1,2,3] %}
+        {% for spot_id in spot_ids %}
         <div style="border: 1px solid #ccc; padding: 10px; text-align: center;">
             <h2>Spot {{ spot_id }}</h2>
             <img id="camera_{{ spot_id }}" width="360" height="240" alt="Camera Feed {{ spot_id }}">

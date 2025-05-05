@@ -1,39 +1,70 @@
+<!--
+admin_dashboard.html
+
+Template for ParkScout Admin Dashboard.
+Displays:
+  - A button to add a new parking spot.
+  - A list of all parking spots with their current status.
+  - Remove buttons for each spot (with confirmation prompt).
+  - Navigation links back to home and logout.
+  - Flash messages for success/error feedback.
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Page metadata and linked stylesheet -->
     <meta charset="UTF-8">
     <title>Admin Dashboard - ParkScout</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
+    <!-- Main heading -->
     <h1>Admin Dashboard</h1>
 
-    <!-- Add New Spot Button -->
+    <!-- Add New Spot Section -->
+    <!-- Form submits to add_spot route to create a new spot -->
     <form action="{{ url_for('add_spot') }}" method="post" style="display:inline;">
         <button type="submit">➕ Add New Parking Spot</button>
     </form>
 
+    <!-- List All Spots Section -->
     <h2>All Parking Spots</h2>
-
     <ul>
-    {% for spot in spots %}
+        {% for spot in spots %}
         <li>
-            <strong>Spot ID:</strong> {{ spot['id'] }} - <strong>Status:</strong> {{ spot['status'] }}
-            <form method="post" action="{{ url_for('remove_spot', spot_id=spot['id']) }}" style="display:inline;">
-                <button type="submit" onclick="return confirm('Are you sure you want to remove this spot?');">Remove</button>
+            <!-- Display each spot's ID and status -->
+            <strong>Spot ID:</strong> {{ spot['id'] }} -
+            <strong>Status:</strong> {{ spot['status'] }}
+
+            <!-- Remove button: confirms before submitting to remove_spot route -->
+            <form method="post"
+                  action="{{ url_for('remove_spot', spot_id=spot['id']) }}"
+                  style="display:inline;">
+                <button type="submit"
+                        onclick="return confirm('Are you sure you want to remove this spot?');">
+                    Remove
+                </button>
             </form>
         </li>
-    {% endfor %}
+        {% endfor %}
     </ul>
 
+    <!-- Navigation Links -->
     <br>
     <a href="{{ url_for('home') }}">Back to Home</a><br>
     <a href="{{ url_for('logout') }}">Logout</a>
 
+    <!-- Flash Messages Block -->
+    <!-- Renders any flashed messages with their categories as CSS classes -->
     {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, message in messages %}
-        <div class="{{ category }}">{{ message }}</div>
-      {% endfor %}
+      {% if messages %}
+        <div class="flash-messages">
+          {% for category, message in messages %}
+            <div class="{{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
     {% endwith %}
 </body>
 </html>

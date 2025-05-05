@@ -1,30 +1,57 @@
+<!--
+login.html
+
+Template for ParkScout login and registration page.
+Provides form for users to either log in or register.
+Displays flash messages for feedback (success, warning, error).
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Page metadata -->
     <meta charset="UTF-8">
     <title>ParkScout - Login/Register</title>
+    <!-- Link to main stylesheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
+    <!-- Main heading -->
     <h1>Welcome to ParkScout</h1>
     <h2>Login or Register</h2>
 
+    <!--
+      Login/Register form:
+      - Uses POST to submit 'action' parameter (login or register)
+      - Requires both username and password
+    -->
     <form method="post">
-        <label>Username:</label><br>
-        <input type="text" name="username" required><br><br>
+        <!-- Username field -->
+        <label for="username">Username:</label><br>
+        <input id="username" type="text" name="username" required><br><br>
 
-        <label>Password:</label><br>
-        <input type="password" name="password" required><br><br>
+        <!-- Password field -->
+        <label for="password">Password:</label><br>
+        <input id="password" type="password" name="password" required><br><br>
 
+        <!-- Action buttons -->
         <button type="submit" name="action" value="login">Login</button>
         <button type="submit" name="action" value="register">Register</button>
     </form>
 
+    <!--
+      Flash messages block:
+      - Retrieves messages with their categories (e.g., success, danger)
+      - Renders each inside a div with a matching CSS class
+    -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        {% for category, message in messages %}
-          <div class="{{ category }}">{{ message }}</div>
-        {% endfor %}
+        <div class="flash-messages">
+          {% for category, message in messages %}
+            <!-- Each message styled by its category -->
+            <div class="{{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
       {% endif %}
     {% endwith %}
 </body>

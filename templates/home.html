@@ -1,71 +1,107 @@
+<!--
+home.html
+
+Template for ParkScout Home page.
+Displays:
+  - A live‐updating list of parking spots with reserve buttons.
+  - Links to history, admin dashboard (if admin), camera feed, and logout.
+  - Flash messages for success/error feedback.
+  - JavaScript to refresh spot statuses every second via the /api/parking_spots endpoint.
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Page metadata and CSS -->
     <meta charset="UTF-8">
     <title>ParkScout - Home</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
+    <!-- Main heading -->
     <h1>Parking Spots</h1>
 
+    <!--
+      Spot list container:
+      - <ul> whose contents are dynamically updated on page load and every second.
+      - Each <li> shows spot ID, status, and a Reserve button if available.
+    -->
     <ul id="spot-list">
-    {% for spot in spots %}
+      {% for spot in spots %}
         <li>
-            <strong>Spot ID:</strong> {{ spot['id'] }} - <strong>Status:</strong> {{ spot['status'] }}
-            {% if spot['status'] == 'available' %}
-            <form action="{{ url_for('reserve', spot_id=spot['id']) }}" method="post" style="display:inline;">
-                <button type="submit">Reserve</button>
+          <!-- Display spot details -->
+          <strong>Spot ID:</strong> {{ spot['id'] }} -
+          <strong>Status:</strong> {{ spot['status'] }}
+
+          <!-- Show Reserve button only when status is 'available' -->
+          {% if spot['status'] == 'available' %}
+            <form action="{{ url_for('reserve', spot_id=spot['id']) }}"
+                  method="post" style="display:inline;">
+              <button type="submit">Reserve</button>
             </form>
-            {% endif %}
+          {% endif %}
         </li>
-    {% endfor %}
+      {% endfor %}
     </ul>
 
+    <!-- Navigation links -->
     <br>
     <a href="{{ url_for('history') }}">View My Parking History</a><br>
     {% if session.get('is_admin') %}
-        <a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a><br>
+      <!-- Only visible to admin users -->
+      <a href="{{ url_for('admin_dashboard') }}">Admin Dashboard</a><br>
     {% endif %}
     <a href="{{ url_for('camera') }}">Live Camera Feed</a><br>
     <a href="{{ url_for('logout') }}">Logout</a>
 
+    <!-- Flash messages block:
+         - Retrieves any flashed messages with their categories
+         - Renders each in a div with the category as its CSS class
+    -->
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
-        {% for category, message in messages %}
-          <div class="{{ category }}">{{ message }}</div>
-        {% endfor %}
+        <div class="flash-messages">
+          {% for category, message in messages %}
+            <div class="{{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
       {% endif %}
     {% endwith %}
 
-    <!-- Live Refresh Script -->
+    <!--
+      Live Refresh Script:
+      - Defines refreshSpots() to fetch current spot data from /api/parking_spots
+      - Rebuilds the <ul id="spot-list"> contents each time
+      - Automatically called once on load, then every second
+    -->
     <script>
-    function refreshSpots() {
+      function refreshSpots() {
         fetch('/api/parking_spots')
-        .then(response => response.json())
-        .then(data => {
+          .then(response => response.json())
+          .then(data => {
             const spotList = document.getElementById('spot-list');
             spotList.innerHTML = '';
             data.spots.forEach(spot => {
-                let spotElement = document.createElement('li');
-                spotElement.innerHTML = `
-                    <strong>Spot ID:</strong> ${spot.id} - <strong>Status:</strong> ${spot.status}
-                    ${spot.status === 'available' ? `
-                        <form action="/reserve/${spot.id}" method="post" style="display:inline;">
-                            <button type="submit">Reserve</button>
-                        </form>
-                    ` : ''}
-                `;
-                spotList.appendChild(spotElement);
+              // Build each list item
+              let spotElement = document.createElement('li');
+              spotElement.innerHTML = `
+                <strong>Spot ID:</strong> ${spot.id} -
+                <strong>Status:</strong> ${spot.status}
+                ${spot.status === 'available' ? `
+                  <form action="/reserve/${spot.id}" method="post" style="display:inline;">
+                    <button type="submit">Reserve</button>
+                  </form>
+                ` : ''}
+              `;
+              spotList.appendChild(spotElement);
             });
-        });
-    }
+          });
+      }
 
-    // Refresh every 3 seconds
-    setInterval(refreshSpots, 1000);
-
-    // Load spots immediately when page loads
-    refreshSpots();
+      // Initial load
+      refreshSpots();
+      // Refresh every 1 second (1000 ms)
+      setInterval(refreshSpots, 1000);
     </script>
-
 </body>
 </html>

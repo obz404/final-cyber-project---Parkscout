@@ -1,17 +1,33 @@
+<!--
+history.html
+
+Template for ParkScout Parking History page.
+Displays a list of past reservations for the logged-in user.
+Shows date, time, spot ID, and action for each record.
+Provides navigation links back to home and logout.
+-->
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <!-- Page metadata and CSS link -->
     <meta charset="UTF-8">
     <title>ParkScout - Parking History</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
+    <!-- Main heading -->
     <h1>My Parking History</h1>
 
+    <!--
+      If there are history records, render them as a list.
+      Each record includes date, time, spot ID, and action.
+    -->
     {% if records %}
         <ul>
         {% for record in records %}
             <li>
+                <!-- Display reservation details -->
                 <strong>Date:</strong> {{ record['parking_date'] }} |
                 <strong>Time:</strong> {{ record['parking_time'] }} |
                 <strong>Spot:</strong> {{ record['spot_id'] }} |
@@ -20,9 +36,11 @@
         {% endfor %}
         </ul>
     {% else %}
+        <!-- Fallback message when no history exists -->
         <p>No parking history found.</p>
     {% endif %}
 
+    <!-- Navigation links -->
     <br>
     <a href="{{ url_for('home') }}">Back to Home</a><br>
     <a href="{{ url_for('logout') }}">Logout</a>

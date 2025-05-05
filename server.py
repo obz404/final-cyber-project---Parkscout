@@ -12,224 +12,409 @@ from datetime import datetime
 # AES Configuration
 AES_KEY = b'ThisIsASecretKey'
 AES_NONCE = b'ThisIsASecretN'
-cipher = Cipher(AES_KEY, AES_NONCE)
 
 # Logging Setup
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
 
-# SQLAlchemy Setup
+# SQLAlchemy base class for declarative models
 Base = declarative_base()
-engine = create_engine("sqlite:///parking.db", connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(bind=engine)
 
-# Database Models
 class User(Base):
+    """
+    Represents a user in the parking system.
+
+    Attributes:
+        id (int): Primary key.
+        username (str): Unique username.
+        password (str): Hashed password.
+        is_admin (int): 1 if user is admin, 0 otherwise.
+        history (List[ParkingHistory]): Related parking history entries.
+    """
     __tablename__ = 'users'
-    id = Column(Integer, primary_key=True)
+
+    id       = Column(Integer, primary_key=True)
     username = Column(String, unique=True, nullable=False)
     password = Column(String, nullable=False)
-    is_admin = Column(Integer, default=0)  # <--- ADD THIS
-    history = relationship("ParkingHistory", back_populates="user")
+    is_admin = Column(Integer, default=0)
+    history  = relationship("ParkingHistory", back_populates="user")
 
 class ParkingHistory(Base):
+    """
+    Records each parking reservation made by a user.
+
+    Attributes:
+        id (int): Primary key.
+        user_id (int): Foreign key to User.id.
+        parking_date (str): Date of reservation (YYYY-MM-DD).
+        parking_time (str): Time of reservation (HH:MM:SS).
+        spot_id (int): ID of the reserved parking spot.
+        user (User): Back-reference to the User.
+    """
     __tablename__ = 'parking_history'
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('users.id'))
-    parking_date = Column(String, nullable=False)
-    parking_time = Column(String, nullable=False)
-    spot_id = Column(Integer, nullable=True)  # <--- ADD THIS
-    user = relationship("User", back_populates="history")
+
+    id            = Column(Integer, primary_key=True)
+    user_id       = Column(Integer, ForeignKey('users.id'))
+    parking_date  = Column(String, nullable=False)
+    parking_time  = Column(String, nullable=False)
+    spot_id       = Column(Integer, nullable=True)
+    user          = relationship("User", back_populates="history")
 
 class ParkingSpot(Base):
+    """
+    Represents a parking spot in the system.
+
+    Attributes:
+        id (int): Primary key.
+        status (str): 'available', 'reserved', etc.
+    """
     __tablename__ = 'parking_spots'
-    id = Column(Integer, primary_key=True)
+
+    id     = Column(Integer, primary_key=True)
     status = Column(String, default="available")
-# Initialize Database
-def init_database():
-    Base.metadata.create_all(engine)
 
-# Helper function to check if message is encrypted
+class ParkingServer:
+    """
+    A socket-based server for managing parking spots, reservations, and history,
+    with optional AES encryption for client-server communication.
 
-def is_likely_encrypted(data):
-    try:
-        json.loads(data.decode('utf-8'))
-        return False  # valid JSON, not encrypted
-    except:
-        return True
+    Methods:
+        init_database: Create DB tables if they don't exist.
+        start:          Begin listening for client connections.
+        shutdown:       Gracefully close server.
+    """
 
-# Client Handler
+    def __init__(self, host="127.0.0.1", port=65432, max_workers=10, db_url="sqlite:///parking.db"):
+        """
+        Initialize server settings, AES cipher, DB engine, and thread pool.
 
-def handle_client(sock, addr):
-    logging.info(f"[CONNECTED] {addr}")
-    session = SessionLocal()
+        Args:
+            host (str): IP address to bind.
+            port (int): Port number to listen on.
+            max_workers (int): Max threads for client handlers.
+            db_url (str): SQLAlchemy DB connection URL.
+        """
+        self.host = host
+        self.port = port
+        self.cipher = Cipher(AES_KEY, AES_NONCE)
+        self.engine = create_engine(db_url, connect_args={"check_same_thread": False})
+        self.SessionLocal = sessionmaker(bind=self.engine)
+        self.executor = ThreadPoolExecutor(max_workers=max_workers)
+        self.server_socket = None
 
-    try:
-        while True:
-            raw_data = sock.recv(4096)
-            if not raw_data:
-                break
+    def init_database(self):
+        """Create all tables defined on Base if not already present."""
+        Base.metadata.create_all(self.engine)
 
-            try:
-                if is_likely_encrypted(raw_data):
-                    decrypted_data = cipher.aes_decrypt(raw_data)
-                else:
-                    decrypted_data = raw_data.decode("utf-8")
-                request = json.loads(decrypted_data)
-            except Exception as e:
-                logging.error(f"[DECRYPTION ERROR] {e}")
-                error = json.dumps({"status": "error", "message": "Invalid request."}).encode()
-                sock.send(error)
-                break
+    @staticmethod
+    def _is_likely_encrypted(raw: bytes) -> bool:
+        """
+        Heuristic to guess if data is encrypted (non-JSON).
 
-            action = request.get("action")
-            response = {}
+        Args:
+            raw (bytes): Raw payload from socket.
 
-            if action == "register":
-                username, password = request.get("username"), request.get("password")
-                is_admin = request.get("is_admin", False)  # <-- NEW LINE: get is_admin from client (default False)
+        Returns:
+            bool: True if payload is probably encrypted.
+        """
+        try:
+            json.loads(raw.decode("utf-8"))
+            return False
+        except:
+            return True
 
-                if session.query(exists().where(User.username == username)).scalar():
-                    response = {"status": "error", "message": "Username already exists"}
-                else:
-                    user = User(
-                        username=username,
-                        password=generate_password_hash(password),
-                        is_admin=1 if is_admin else 0  # <-- NEW: store 1 (true) if admin
-                    )
-                    session.add(user)
-                    session.commit()
-                    response = {"status": "success", "message": "Registered successfully"}
+    def handle_client(self, sock: socket.socket, addr):
+        """
+        Main loop for handling a single client: receive, decrypt, dispatch, and respond.
 
-            elif action == "login":
-                username, password = request.get("username"), request.get("password")
-                user = session.query(User).filter_by(username=username).first()
-                if user and check_password_hash(user.password, password):
-                    response = {
-                        "status": "success",
-                        "message": "Login successful",
-                        "user_id": user.id,
-                        "is_admin": bool(user.is_admin)  # <-- ADD THIS LINE
-                    }
-                else:
+        Args:
+            sock (socket.socket): Connected client socket.
+            addr (tuple): Client address.
+        """
+        logging.info(f"[CONNECTED] {addr}")
+        session = self.SessionLocal()
+        try:
+            while True:
+                raw_data = sock.recv(4096)
+                if not raw_data:
+                    break
 
-                    response = {"status": "error", "message": "Invalid credentials"}
+                # Attempt decryption if necessary
+                try:
+                    if self._is_likely_encrypted(raw_data):
+                        decrypted = self.cipher.aes_decrypt(raw_data)
+                    else:
+                        decrypted = raw_data.decode("utf-8")
+                    request = json.loads(decrypted)
+                except Exception as e:
+                    logging.error(f"[DECRYPTION ERROR] {e}")
+                    sock.send(json.dumps({"status":"error","message":"Invalid request"}).encode())
+                    break
 
-            elif action == "add_parking_history":
-                user_id, date, time = request.get("user_id"), request.get("parking_date"), request.get("parking_time")
-                if session.query(User).filter_by(id=user_id).first():
-                    session.add(ParkingHistory(user_id=user_id, parking_date=date, parking_time=time))
-                    session.commit()
-                    response = {"status": "success", "message": "Parking history recorded"}
-                else:
-                    response = {"status": "error", "message": "User not found"}
+                # Route the action and prepare response
+                action = request.get("action")
+                response = self.dispatch_action(action, request, session)
 
-            elif action == "get_parking_history":
-                user_id = request.get("user_id")
-                history = session.query(ParkingHistory).filter_by(user_id=user_id).all()
-                if history:
-                    response = {"status": "success", "history": [
-                        {
-                            "parking_date": h.parking_date,
-                            "parking_time": h.parking_time,
-                            "spot_id": h.spot_id,
-                            "action": "Reserved"
-                        } for h in history
-                    ]}
-                else:
-                    response = {"status": "error", "message": "No history found"}
+                # Encrypt response if client expects encrypted channel
+                out = json.dumps(response).encode("utf-8")
+                try:
+                    sock.send(self.cipher.aes_encrypt(out))
+                except:
+                    sock.send(out)
 
-            elif action == "get_parking_spots":
-                spots = session.query(ParkingSpot).all()
-                response = {"status": "success", "spots": [{"id": s.id, "status": s.status} for s in spots]}
+        except Exception as e:
+            logging.error(f"[ERROR] {e}")
+        finally:
+            sock.close()
+            session.close()
+            logging.info(f"[DISCONNECTED] {addr}")
 
-            elif action == "update_spot_status":
-                spot_id = request.get("spot_id")
-                status = request.get("status")
-                spot = session.query(ParkingSpot).filter_by(id=spot_id).first()
-                if spot:
-                    spot.status = status
-                    session.commit()
-                    response = {"status": "success", "message": f"Spot {spot_id} updated to {status}."}
-                else:
-                    response = {"status": "error", "message": "Spot not found."}
+    def dispatch_action(self, action, request, session):
+        """
+        Map an action string to the corresponding handler method.
 
-            elif action == "update_parking_spot":
-                spot_id, new_status = request.get("spot_id"), request.get("status")
-                spot = session.query(ParkingSpot).filter_by(id=spot_id).first()
-                if spot:
-                    spot.status = new_status
-                    session.commit()
-                    response = {"status": "success", "message": "Spot updated"}
-                else:
-                    response = {"status": "error", "message": "Spot not found"}
+        Args:
+            action (str): Name of the requested action.
+            request (dict): Parsed JSON payload.
+            session (Session): SQLAlchemy DB session.
 
-            elif action == "add_parking_spot":
-                new_spot = ParkingSpot(status="available")
-                session.add(new_spot)
-                session.commit()
-                response = {"status": "success", "message": f"Spot {new_spot.id} added", "spot_id": new_spot.id}
+        Returns:
+            dict: Response payload.
+        """
+        mapping = {
+            "register": self._register,
+            "login": self._login,
+            "add_parking_history": self._add_history,
+            "get_parking_history": self._get_history,
+            "get_parking_spots": lambda req, sess: self._list_spots(sess),
+            "update_spot_status": self._update_spot,
+            "add_parking_spot": lambda req, sess: self._add_spot(sess),
+            "reserve_spot": self._reserve_spot,
+            "remove_parking_spot": self._remove_spot
+        }
+        handler = mapping.get(action)
+        if handler:
+            return handler(request, session)
+        return {"status": "error", "message": "Invalid action"}
 
-            elif action == "reserve_spot":
+    def _register(self, req, session):
+        """
+        Create a new user account.
 
-                user_id, spot_id = request.get("user_id"), request.get("spot_id")
-                user = session.query(User).filter_by(id=user_id).first()
-                spot = session.query(ParkingSpot).filter_by(id=spot_id).first()
-                if user and spot and spot.status == "available":
-                    spot.status = "reserved"
-                    session.commit()
-                    now = datetime.now()
-                    parking_date = now.strftime("%Y-%m-%d")
-                    parking_time = now.strftime("%H:%M:%S")
-                    session.add(ParkingHistory(
-                        user_id=user_id,
-                        parking_date=parking_date,
-                        parking_time=parking_time,
-                        spot_id=spot_id
-                    ))
+        Expects:
+            req['username'], req['password'], optional req['is_admin'].
 
-                    session.commit()
-                    response = {"status": "success", "message": f"Spot {spot_id} reserved"}
-                else:
-                    response = {"status": "error", "message": "Cannot reserve spot"}
+        Returns:
+            dict: Success or error message.
+        """
+        username = req.get("username")
+        password = req.get("password")
+        is_admin = req.get("is_admin", False)
+        # Check uniqueness
+        if session.query(exists().where(User.username == username)).scalar():
+            return {"status":"error","message":"Username already exists"}
+        # Create user
+        user = User(
+            username=username,
+            password=generate_password_hash(password),
+            is_admin=1 if is_admin else 0
+        )
+        session.add(user)
+        session.commit()
+        return {"status":"success","message":"Registered successfully"}
 
-            elif action == "remove_parking_spot":
-                spot_id = request.get("spot_id")
-                spot = session.query(ParkingSpot).filter_by(id=spot_id).first()
-                if spot:
-                    session.delete(spot)
-                    session.commit()
-                    response = {"status": "success", "message": f"Spot {spot_id} removed"}
-                else:
-                    response = {"status": "error", "message": "Spot not found"}
+    def _login(self, req, session):
+        """
+        Authenticate a user.
 
-            else:
-                response = {"status": "error", "message": "Invalid action"}
-            response_bytes = json.dumps(response).encode("utf-8")
-            try:
-                sock.send(cipher.aes_encrypt(response_bytes))
-            except:
-                sock.send(response_bytes)
+        Expects:
+            req['username'], req['password'].
 
-    except Exception as e:
-        logging.error(f"[ERROR] {e}")
-    #  finally:
-    #     sock.close()
-    #     session.close()
-    #     logging.info(f"[DISCONNECTED] {addr}")
-# Server Starter
-def start_server(host="127.0.0.1", port=65432):
-    init_database()
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((host, port))
-    server.listen()
-    logging.info(f"[LISTENING] Server started on {host}:{port}")
-    executor = ThreadPoolExecutor(max_workers=10)
-    try:
-        while True:
-            client_sock, addr = server.accept()
-            executor.submit(handle_client, client_sock, addr)
-    except KeyboardInterrupt:
-        logging.info("[SHUTDOWN] Server shutting down...")
-        server.close()
+        Returns:
+            dict: Login result, including user_id and is_admin flag.
+        """
+        username = req.get("username")
+        password = req.get("password")
+        user = session.query(User).filter_by(username=username).first()
+        if user and check_password_hash(user.password, password):
+            return {
+                "status":"success",
+                "message":"Login successful",
+                "user_id": user.id,
+                "is_admin": bool(user.is_admin)
+            }
+        return {"status":"error","message":"Invalid credentials"}
+
+    def _add_history(self, req, session):
+        """
+        Record a manual parking history entry for a user.
+
+        Expects:
+            req['user_id'], req['parking_date'], req['parking_time'].
+
+        Returns:
+            dict: Success or error message.
+        """
+        user_id = req.get("user_id")
+        date, time = req.get("parking_date"), req.get("parking_time")
+        if session.query(User).filter_by(id=user_id).first():
+            session.add(ParkingHistory(
+                user_id=user_id,
+                parking_date=date,
+                parking_time=time
+            ))
+            session.commit()
+            return {"status":"success","message":"Parking history recorded"}
+        return {"status":"error","message":"User not found"}
+
+    def _get_history(self, req, session):
+        """
+        Fetch all parking history entries for a user.
+
+        Expects:
+            req['user_id'].
+
+        Returns:
+            dict: List of history entries or error.
+        """
+        user_id = req.get("user_id")
+        entries = session.query(ParkingHistory).filter_by(user_id=user_id).all()
+        if not entries:
+            return {"status":"error","message":"No history found"}
+        return {
+            "status":"success",
+            "history":[
+                {
+                    "parking_date": e.parking_date,
+                    "parking_time": e.parking_time,
+                    "spot_id": e.spot_id,
+                    "action": "Reserved"
+                } for e in entries
+            ]
+        }
+
+    def _list_spots(self, session):
+        """
+        List all parking spots with their current status.
+
+        Returns:
+            dict: List of spot IDs and statuses.
+        """
+        spots = session.query(ParkingSpot).all()
+        return {
+            "status": "success",
+            "spots": [{"id": s.id, "status": s.status} for s in spots]
+        }
+
+    def _update_spot(self, req, session):
+        """
+        Update the status of a specific spot.
+
+        Expects:
+            req['spot_id'], req['status'].
+
+        Returns:
+            dict: Success or error message.
+        """
+        spot = session.get(ParkingSpot, req.get("spot_id"))
+
+        if not spot:
+            return {"status":"error","message":"Spot not found"}
+        spot.status = req.get("status")
+        session.commit()
+        return {"status":"success","message":f"Spot {spot.id} updated to {spot.status}."}
+
+    def _add_spot(self, session):
+        """
+        Create a new parking spot record.
+
+        Returns:
+            dict: New spot ID.
+        """
+        new_spot = ParkingSpot()
+        session.add(new_spot)
+        session.commit()
+        return {
+            "status":"success",
+            "message":f"Spot {new_spot.id} added",
+            "spot_id": new_spot.id
+        }
+
+    def _reserve_spot(self, req, session):
+        """
+        Reserve an available spot for a user and record history.
+
+        Expects:
+            req['user_id'], req['spot_id'].
+
+        Returns:
+            dict: Success or error.
+        """
+        user = session.get(User, req.get("user_id"))
+        spot = session.get(ParkingSpot, req.get("spot_id"))
+
+        if user and spot and spot.status == "available":
+            spot.status = "reserved"
+            now = datetime.now()
+            session.add(ParkingHistory(
+                user_id=user.id,
+                parking_date=now.strftime("%Y-%m-%d"),
+                parking_time=now.strftime("%H:%M:%S"),
+                spot_id=spot.id
+            ))
+            session.commit()
+            return {"status":"success","message":f"Spot {spot.id} reserved"}
+        return {"status":"error","message":"Cannot reserve spot"}
+
+    def _remove_spot(self, req, session):
+        """
+        Delete a parking spot record.
+
+        Expects:
+            req['spot_id'].
+
+        Returns:
+            dict: Success or error message.
+        """
+        spot = session.get(ParkingSpot, req.get("spot_id"))
+
+        if not spot:
+            return {"status":"error","message":"Spot not found"}
+        session.delete(spot)
+        session.commit()
+        return {"status":"success","message":f"Spot {spot.id} removed"}
+
+    def start(self):
+        """
+        Initialize DB, bind socket, and enter accept loop to handle clients.
+        """
+        self.init_database()
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((self.host, self.port))
+        self.server_socket.listen()
+        logging.info(f"[LISTENING] Server running on {self.host}:{self.port}")
+
+        try:
+            while True:
+                client_sock, addr = self.server_socket.accept()
+                # Submit each client handler to the thread pool
+                self.executor.submit(self.handle_client, client_sock, addr)
+        except KeyboardInterrupt:
+            self.shutdown()
+
+    def shutdown(self):
+        """
+        Gracefully shut down the server and thread pool.
+        """
+        logging.info("[SHUTDOWN] Server is shutting down")
+        if self.server_socket:
+            self.server_socket.close()
+        self.executor.shutdown(wait=False)
+
+
 if __name__ == "__main__":
-    start_server()
+    # Entry point: start the parking server
+    server = ParkingServer(host="127.0.0.1", port=65432, max_workers=10)
+    server.start()

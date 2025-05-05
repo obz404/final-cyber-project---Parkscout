@@ -1,27 +1,57 @@
+/* =============================================================================
+   styles.css
 
+   Main stylesheet for ParkScout web interface.
+   Defines global layout, typography, form elements, buttons, links,
+   alert messages, and list/item styling.
+   ============================================================================= */
+
+/* ---------------------------
+   Global page styles
+   --------------------------- */
 body {
+    /* Use a clean, sans-serif font and light background */
     font-family: Arial, sans-serif;
     background-color: #f7f7f7;
     margin: 0;
     padding: 20px;
 }
+
+/* Headings */
 h1, h2 {
+    /* Dark gray color for titles */
     color: #333;
 }
+
+/* ---------------------------
+   Form styling
+   --------------------------- */
 form {
+    /* Spacing above and below forms */
     margin-top: 20px;
     margin-bottom: 20px;
 }
-input[type="text"], input[type="password"] {
+
+/* Text inputs and password fields */
+input[type="text"],
+input[type="password"] {
+    /* Fixed width and internal padding */
     width: 250px;
     padding: 8px;
     margin: 8px 0;
     display: block;
+    /* Light gray border with slight rounding */
     border: 1px solid #ccc;
     border-radius: 4px;
 }
+
+/* ---------------------------
+   Button styling
+   --------------------------- */
 button {
+    /* Padding for click targets */
     padding: 10px 20px;
+    /* Brand blue background with white text */
     background-color: #007BFF;
     color: white;
     border: none;
@@ -29,41 +59,68 @@ button {
     cursor: pointer;
     margin-top: 10px;
 }
+
+/* Hover state for buttons */
 button:hover {
+    /* Darker blue to indicate hover */
     background-color: #0056b3;
 }
+
+/* ---------------------------
+   Link styling
+   --------------------------- */
 a {
     display: inline-block;
     margin-top: 10px;
     color: #007BFF;
     text-decoration: none;
 }
+
+/* Hover state for links */
 a:hover {
     text-decoration: underline;
 }
+
+/* ---------------------------
+   Flash/Alert messages
+   --------------------------- */
 .alert {
     margin-top: 15px;
     padding: 10px;
     border-radius: 4px;
     color: white;
 }
+
+/* Success alerts (green) */
 .success {
     background-color: #28a745;
 }
+
+/* Warning alerts (yellow) */
 .warning {
     background-color: #ffc107;
-    color: black;
+    color: black; /* Dark text for readability */
 }
+
+/* Error/danger alerts (red) */
 .danger {
     background-color: #dc3545;
 }
+
+/* ---------------------------
+   List styling (e.g., spot lists, history)
+   --------------------------- */
 ul {
+    /* Remove default bullets and padding */
     list-style-type: none;
     padding: 0;
 }
+
 li {
+    /* Spacing between list items */
     margin-bottom: 10px;
     padding: 10px;
+    /* White background with subtle border */
     background-color: white;
     border: 1px solid #ddd;
     border-radius: 4px;

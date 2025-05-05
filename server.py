@@ -379,7 +379,7 @@ class ParkingServer:
             dict: Success or error message.
         """
         spot = session.get(ParkingSpot, req.get("spot_id"))
-
+עו
         if not spot:
             return {"status":"error","message":"Spot not found"}
         session.delete(spot)

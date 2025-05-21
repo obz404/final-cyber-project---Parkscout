@@ -92,8 +92,23 @@ def get_current_status(spot_id):
         payload = json.dumps(request).encode("utf-8")
         camera_sock.sendall(cipher.aes_encrypt(payload))
 
-        encrypted_resp = camera_sock.recv(4096)
+        # Read 4-byte length prefix
+        raw_len = camera_sock.recv(4)
+        if len(raw_len) < 4:
+            raise ValueError("Incomplete length prefix")
+        msg_len = int.from_bytes(raw_len, byteorder='big')
+
+        # Now receive the full encrypted response
+        encrypted_resp = b""
+        while len(encrypted_resp) < msg_len:
+            chunk = camera_sock.recv(min(4096, msg_len - len(encrypted_resp)))
+            if not chunk:
+                break
+            encrypted_resp += chunk
+
+        # Decrypt
         decrypted_resp = cipher.aes_decrypt(encrypted_resp)
+
         data = json.loads(decrypted_resp)
 
         for spot in data.get("spots", []):
@@ -127,9 +142,24 @@ def send_status_to_server(spot_id, status):
         payload = json.dumps(message).encode("utf-8")
         camera_sock.sendall(cipher.aes_encrypt(payload))
 
-        encrypted_resp = camera_sock.recv(4096)
-        decrypted = cipher.aes_decrypt(encrypted_resp)
-        response = json.loads(decrypted)
+        # Read 4-byte length prefix
+        raw_len = camera_sock.recv(4)
+        if len(raw_len) < 4:
+            raise ValueError("Incomplete length prefix")
+        msg_len = int.from_bytes(raw_len, byteorder='big')
+
+        # Now receive the full encrypted response
+        encrypted_resp = b""
+        while len(encrypted_resp) < msg_len:
+            chunk = camera_sock.recv(min(4096, msg_len - len(encrypted_resp)))
+            if not chunk:
+                break
+            encrypted_resp += chunk
+
+        # Decrypt
+        decrypted_resp = cipher.aes_decrypt(encrypted_resp)
+
+        response = json.loads(decrypted_resp)
         print(f"🔁 Server response: {response}")
     except Exception as e:
         print(f"⚠️ Failed to contact server: {e}")

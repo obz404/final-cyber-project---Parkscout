@@ -24,10 +24,9 @@ from flask import send_file
 from io import BytesIO
 import base64
 
-import cv2
 from flask import (
     Flask, render_template, request, redirect, url_for,
-    session, flash, Response
+    session, flash
 )
 from aes_cipher import Cipher
 
@@ -71,7 +70,7 @@ cipher    = Cipher(AES_KEY, AES_NONCE)
 # -------------------------------------------------------------------
 # ParkingServer connection settings
 # -------------------------------------------------------------------
-SERVER_HOST = "127.0.0.1"
+SERVER_HOST = "192.168.68.81"
 SERVER_PORT = 65432
 
 # =================== Utility Functions ===================
@@ -99,14 +98,19 @@ def send_request(action, data=None):
         client_sock.sendall(encrypted)
 
         # Receive and decrypt response
+        # New: receive 4-byte length prefix
+        raw_len = client_sock.recv(4)
+        if len(raw_len) < 4:
+            raise ValueError("Incomplete length prefix")
+        msg_len = int.from_bytes(raw_len, byteorder='big')
+
+        # Receive full encrypted message
         encrypted_resp = b""
-        while True:
-            chunk = client_sock.recv(4096)
+        while len(encrypted_resp) < msg_len:
+            chunk = client_sock.recv(min(4096, msg_len - len(encrypted_resp)))
             if not chunk:
                 break
             encrypted_resp += chunk
-            if len(chunk) < 4096:
-                break
 
         decrypted = cipher.aes_decrypt(encrypted_resp)
         return json.loads(decrypted)
@@ -325,16 +329,6 @@ def api_parking_spots():
     """
     return send_request('get_parking_spots')
 
-@app.route('/video_feed')
-def video_feed():
-    """
-    Streaming endpoint for live camera frames.
-    Uses multipart/x-mixed-replace to serve JPEG frames.
-    """
-    return Response(
-        generate_camera_feed(),
-        mimetype='multipart/x-mixed-replace; boundary=frame'
-    )
 @app.route('/camera_image/<int:spot_id>')
 @login_required
 def camera_image(spot_id):
@@ -346,23 +340,6 @@ def camera_image(spot_id):
     else:
         return "Image not found", 404
 
-def generate_camera_feed():
-    """
-    Generator function that captures frames from the default camera
-    and yields them as JPEG frames for the video_feed endpoint.
-    """
-    cap = cv2.VideoCapture(0)
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        _, buffer = cv2.imencode('.jpg', frame)
-        frame_bytes = buffer.tobytes()
-        yield (
-            b'--frame\r\n'
-            b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n'
-        )
-    cap.release()
 
 # =================== Application Entry Point ===================
 

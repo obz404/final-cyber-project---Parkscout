@@ -162,7 +162,11 @@ class ParkingServer:
                 # Encrypt response if client expects encrypted channel
                 out = json.dumps(response).encode("utf-8")
                 try:
-                    sock.send(self.cipher.aes_encrypt(out))
+                    encrypted_out = self.cipher.aes_encrypt(out)
+                    length = len(encrypted_out)
+                    sock.sendall(length.to_bytes(4, byteorder='big'))  # Send 4-byte header
+                    sock.sendall(encrypted_out)  # Send actual encrypted message
+
                 except:
                     sock.send(out)
 
@@ -303,6 +307,7 @@ class ParkingServer:
         spot_id = req.get("spot_id")
         file_path = os.path.join(os.path.dirname(__file__), "static", f"camera_feed_{spot_id}.jpg")
         print(f"🖼️ Trying to load image from: {file_path}")
+        print("📂 Exists?", os.path.exists(file_path))
         try:
             with open(file_path, "rb") as img_file:
                 img_bytes = img_file.read()
@@ -435,5 +440,5 @@ class ParkingServer:
 
 if __name__ == "__main__":
     # Entry point: start the parking server
-    server = ParkingServer(host="127.0.0.1", port=65432, max_workers=10)
+    server = ParkingServer(host="0.0.0.0", port=65432, max_workers=10)
     server.start()

@@ -33,7 +33,7 @@ Displays live camera snapshots and the current status for each parking spot.
                         .then(response => {
                             if (response.ok) {
                                 // If the image exists, append a timestamp to prevent browser caching
-                                camera.src = '/static/camera_feed_' + id + '.jpg?t=' + new Date().getTime();
+                                camera.src = '/camera_image/' + id + '?t=' + new Date().getTime();
                             } else {
                                 // If not found, show a placeholder image
                                 camera.src = '/static/placeholder.jpg';

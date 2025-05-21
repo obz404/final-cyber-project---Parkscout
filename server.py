@@ -8,6 +8,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from concurrent.futures import ThreadPoolExecutor
 from aes_cipher import Cipher  # AES encryption module
 from datetime import datetime
+import base64
+import os
 
 # AES Configuration
 AES_KEY = b'ThisIsASecretKey'
@@ -192,7 +194,9 @@ class ParkingServer:
             "update_spot_status": self._update_spot,
             "add_parking_spot": lambda req, sess: self._add_spot(sess),
             "reserve_spot": self._reserve_spot,
-            "remove_parking_spot": self._remove_spot
+            "remove_parking_spot": self._remove_spot,
+            "get_camera_image": self._get_camera_image,
+
         }
         handler = mapping.get(action)
         if handler:
@@ -294,6 +298,21 @@ class ParkingServer:
                 } for e in entries
             ]
         }
+
+    def _get_camera_image(self, req, session):
+        spot_id = req.get("spot_id")
+        file_path = os.path.join(os.path.dirname(__file__), "static", f"camera_feed_{spot_id}.jpg")
+        print(f"🖼️ Trying to load image from: {file_path}")
+        try:
+            with open(file_path, "rb") as img_file:
+                img_bytes = img_file.read()
+                img_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                return {
+                    "status": "success",
+                    "image": img_b64
+                }
+        except FileNotFoundError:
+            return {"status": "error", "message": "Image not found"}
 
     def _list_spots(self, session):
         """

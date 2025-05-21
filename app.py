@@ -20,6 +20,9 @@ import json
 import os
 from functools import wraps
 from datetime import datetime
+from flask import send_file
+from io import BytesIO
+import base64
 
 import cv2
 from flask import (
@@ -96,7 +99,15 @@ def send_request(action, data=None):
         client_sock.sendall(encrypted)
 
         # Receive and decrypt response
-        encrypted_resp = client_sock.recv(4096)
+        encrypted_resp = b""
+        while True:
+            chunk = client_sock.recv(4096)
+            if not chunk:
+                break
+            encrypted_resp += chunk
+            if len(chunk) < 4096:
+                break
+
         decrypted = cipher.aes_decrypt(encrypted_resp)
         return json.loads(decrypted)
 
@@ -324,6 +335,16 @@ def video_feed():
         generate_camera_feed(),
         mimetype='multipart/x-mixed-replace; boundary=frame'
     )
+@app.route('/camera_image/<int:spot_id>')
+@login_required
+def camera_image(spot_id):
+    response = send_request('get_camera_image', {"spot_id": spot_id})
+    if response.get("status") == "success":
+        image_b64 = response["image"]
+        image_bytes = base64.b64decode(image_b64)
+        return send_file(BytesIO(image_bytes), mimetype='image/jpeg')
+    else:
+        return "Image not found", 404
 
 def generate_camera_feed():
     """

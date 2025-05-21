@@ -70,7 +70,7 @@ cipher    = Cipher(AES_KEY, AES_NONCE)
 # -------------------------------------------------------------------
 # ParkingServer connection settings
 # -------------------------------------------------------------------
-SERVER_HOST = "192.168.68.81"
+SERVER_HOST = "127.0.0.1"
 SERVER_PORT = 65432
 
 # =================== Utility Functions ===================

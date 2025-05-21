@@ -29,7 +29,20 @@ Displays live camera snapshots and the current status for each parking spot.
 
                 // Attempt to load the current snapshot from the camera feed
                 if (camera) {
-                camera.src = '/camera_image/' + id + '?t=' + new Date().getTime();
+                    fetch('/static/camera_feed_' + id + '.jpg', { method: 'HEAD' })
+                        .then(response => {
+                            if (response.ok) {
+                                // If the image exists, append a timestamp to prevent browser caching
+                                camera.src = '/camera_image/' + id + '?t=' + new Date().getTime();
+                            } else {
+                                // If not found, show a placeholder image
+                                camera.src = '/static/placeholder.jpg';
+                            }
+                        })
+                        .catch(() => {
+                            // On fetch error, show placeholder image
+                            camera.src = '/static/placeholder.jpg';
+                        });
                 }
 
                 // Fetch the current status (available/reserved/occupied) for the parking spot
